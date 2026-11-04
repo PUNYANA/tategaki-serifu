@@ -179,3 +179,15 @@ button,.slot,.newcol,.who{touch-action:manipulation}
 #pos .sync.busy,#pos .sync.pending{color:var(--accent)}
 .sheet .clash{border-top-color:var(--warn)}
 .sheet .clash h3{color:var(--warn)}
+/* ログイン用の窓に出す「閉じてください」 */
+.notice{max-width:520px;margin:48px auto;padding:0 8px;text-align:center;line-height:1.8}
+.notice .big{font-size:20px;font-weight:700;color:var(--accent)}
+.notice p{margin:0 0 16px;color:var(--ink)}
+/* 位置表示を少し太く・濃く。横スクロールバーは位置表示と役目がかぶるので出さない */
+#pos{height:18px}
+#pos .thumb{top:-2px;height:7px;opacity:1}
+#pos b{top:-4px;height:11px;width:2px;background:var(--ink);opacity:.6}
+#pos .pg,#pos .sync{font-size:11px;color:var(--ink);opacity:.8}
+#pos .track{height:3px;background:color-mix(in srgb,var(--muted) 45%,transparent)}
+#canvas{scrollbar-width:none}
+#canvas::-webkit-scrollbar{display:none}

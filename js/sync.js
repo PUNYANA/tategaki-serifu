@@ -6,9 +6,9 @@
 //  ・ログインしていなければ何もしない（端末の中だけで使える）
 // 原稿の同期用の項目： doc.path（Dropbox 上のパス）, doc.rev, doc.dirty（未送信の変更あり）
 // 作品フォルダの項目： folder.synced（Dropbox にフォルダを作った）, folder.castRev, folder.castDirty
-import * as dbx from './dropbox.js?v=11';
-import * as db from './db.js?v=11';
-import { parseDoc, docStats, setTitle } from './textfile.js?v=11';
+import * as dbx from './dropbox.js?v=12';
+import * as db from './db.js?v=12';
+import { parseDoc, docStats, setTitle } from './textfile.js?v=12';
 
 let S = null;
 const listeners = [];
@@ -65,7 +65,9 @@ export function schedule() {
 }
 // kind：'full'（取り込み＋送信）/ 'push'（送信だけ）。同期は1つずつ順番に行う
 export function sync(kind = 'full') {
-  if (!dbx.configured() || !dbx.signedIn()) { status = 'local'; emit(); return Promise.resolve(); }
+  if (!dbx.configured()) { status = 'local'; emit(); return Promise.resolve(); }
+  // 別の窓（ログイン用のアプリ内ブラウザ）でログインしたかもしれないので、つないでいなければ端末の記録を読み直す
+  if (!dbx.signedIn()) return dbx.loadToken().then(ok => { if (ok) return sync(kind); status = 'local'; emit(); });
   if (!navigator.onLine) { status = 'offline'; emit(); return Promise.resolve(); }
   if (running) { again = (again === 'full' || kind === 'full') ? 'full' : 'push'; return chain; } // 終わったらもう一度（取り込みを頼まれていたら取り込みも）
   running = true; clearTimeout(pushT);

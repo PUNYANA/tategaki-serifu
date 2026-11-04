@@ -1,10 +1,10 @@
 // 起動と、一覧⇔編集の切り替え
-import { $, toast } from './ui.js?v=11';
-import * as db from './db.js?v=11';
-import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=11';
-import { initList, renderList, newDoc } from './list.js?v=11';
-import * as sync from './sync.js?v=11';
-import { finishSignIn } from './dropbox.js?v=11';
+import { $, toast } from './ui.js?v=12';
+import * as db from './db.js?v=12';
+import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=12';
+import { initList, renderList, newDoc } from './list.js?v=12';
+import * as sync from './sync.js?v=12';
+import { finishSignIn } from './dropbox.js?v=12';
 
 const state = { folders: [], docs: [] };
 
@@ -75,11 +75,21 @@ async function boot() {
   // Dropbox のログインから戻ってきたところなら、ログインを仕上げる
   let justSignedIn = false;
   try { justSignedIn = await finishSignIn(); if (justSignedIn) toast('Dropbox につなぎました'); } catch (e) { toast(e.message); }
+  // ホーム画面のアプリからログインすると、iOS は「アプリ内のブラウザ」の窓の中にこのページを開き直す。
+  // その窓は閉じてもらい、元のアプリに戻ってもらう（ログインの結果は元のアプリと共有される）
+  if (justSignedIn && justSignedIn.inSheet) { showCloseNotice(); return; }
   await sync.init(state); sync.setFlush(flushSave);
   initList(state, showEditor);
   setOnBack(showList);
   const d = !justSignedIn && last && docs.find(x => x.id === last);
   d ? (showEditor(d), sync.sync()) : showList();
+}
+function showCloseNotice() {
+  document.querySelector('header').hidden = false; $('hdr').innerHTML = '';
+  $('listview').hidden = false;
+  $('listview').innerHTML = `<div class="notice"><p class="big">✓ Dropbox につなぎました</p>
+    <p>この画面は閉じてください。<br>左上の「×」を押すか、画面を下にスワイプすると、元のアプリに戻ります。</p>
+    <p>元のアプリに戻ると、自動で同期が始まります。</p></div>`;
 }
 boot().catch(e => { console.error(e); toast('端末の保存領域を開けませんでした'); });
 

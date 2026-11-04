@@ -1,7 +1,7 @@
 // Dropbox API v2 の薄い窓口。ログインは OAuth 2.0 PKCE（サーバー不要・App secret 不要）
 // 権限は App folder（アプリ/縦書きセリフ帳/ 以下だけ）。パスはそのフォルダからの相対（"/作品/第1話.txt"）
-import { DROPBOX_APP_KEY } from './config.js?v=11';
-import * as db from './db.js?v=11';
+import { DROPBOX_APP_KEY } from './config.js?v=12';
+import * as db from './db.js?v=12';
 
 const AUTH = 'https://www.dropbox.com/oauth2/authorize';
 const TOKEN = 'https://api.dropboxapi.com/oauth2/token';
@@ -11,6 +11,8 @@ const CONTENT = 'https://content.dropboxapi.com/2/';
 const redirectUri = () => location.origin + location.pathname.replace(/index\.html$/, '');
 
 export const configured = () => !!DROPBOX_APP_KEY;
+// ホーム画面から起動したアプリ（全画面）として動いているか
+export const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let tok = null; // { access, refresh, exp }
 export async function loadToken() { tok = (await db.getMeta('dbx')) || null; return !!tok; }
 export const signedIn = () => !!(tok && tok.refresh);
@@ -29,11 +31,12 @@ export async function signIn() {
   const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
   const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
   // ホーム画面から起動したときに戻ってこられるよう、localStorage に残す（sessionStorage だと消えることがある）
-  localStorage.setItem('dbx-pkce', JSON.stringify({ verifier, state }));
+  localStorage.setItem('dbx-pkce', JSON.stringify({ verifier, state, standalone: isStandalone() }));
   const q = new URLSearchParams({ client_id: DROPBOX_APP_KEY, response_type: 'code', code_challenge: challenge, code_challenge_method: 'S256', redirect_uri: redirectUri(), token_access_type: 'offline', state });
   location.href = AUTH + '?' + q;
 }
 // Dropbox から戻ってきたとき（?code=…）にトークンへ交換する。戻ってきたのでなければ false
+// 戻り値の inSheet：ホーム画面のアプリからログインして、iOS の「アプリ内のブラウザ」の窓の中に戻ってきた（＝その窓は閉じてもらう）
 export async function finishSignIn() {
   const u = new URL(location.href), code = u.searchParams.get('code'), state = u.searchParams.get('state'), err = u.searchParams.get('error');
   if (!code && !err) return false;
@@ -46,7 +49,7 @@ export async function finishSignIn() {
   const j = await r.json();
   tok = { access: j.access_token, refresh: j.refresh_token, exp: Date.now() + (j.expires_in - 60) * 1000 };
   await db.setMeta('dbx', tok);
-  return true;
+  return { inSheet: !!saved.standalone && !isStandalone() };
 }
 export async function signOut() {
   try { if (tok) await fetch(API + 'auth/token/revoke', { method: 'POST', headers: { Authorization: 'Bearer ' + tok.access } }); } catch (e) { }
