@@ -19,9 +19,12 @@ body{background:var(--paper);color:var(--ink);font-family:var(--f-ui);overflow:h
 #app{height:100%;display:flex;flex-direction:column}
 header{display:flex;align-items:center;gap:12px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--rule)}
 header h1{font-family:var(--f-text);font-size:17px;margin:0;font-weight:700;letter-spacing:.08em}
-#canvas{flex:1;min-height:0;writing-mode:vertical-rl;overflow-x:auto;overflow-y:hidden;
-  padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+/* スクロールする箱は横書きのまま（縦書きの箱をスクロールさせると iPhone・iPad が位置を 0＝先頭へ書き換えた）。中の #sheet を縦書きにする。
+   原稿が画面より短いときは右に寄せる（margin-left:auto。はみ出すときは 0 になり、左から右へ普通にスクロールできる） */
+#canvas{flex:1;min-height:0;display:flex;overflow-x:auto;overflow-y:hidden;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+#sheet{flex:none;margin-left:auto;writing-mode:vertical-rl;box-sizing:border-box;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .blk,.div{position:relative;border-radius:6px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 .blk{padding:66px 10px 58px;background:var(--sheet);border:1px solid var(--rule);border-top:4px solid var(--c,var(--rule));
   font-family:var(--f-text);font-size:21px;line-height:1.75;letter-spacing:.06em;white-space:pre-wrap;word-break:break-all;line-break:strict;cursor:text;

@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=31';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=31';
-import * as db from './db.js?v=31';
-import * as sync from './sync.js?v=31';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=32';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=32';
+import * as db from './db.js?v=32';
+import * as sync from './sync.js?v=32';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -30,7 +30,8 @@ let active = false;  // 編集画面を表示中か
 let saveT = 0;
 let sel = new Set();
 const undo = [], redo = [];
-const cv = $('canvas');
+const cv = $('canvas');   // 横にスクロールする箱（横書き）
+const sheet = $('sheet'); // その中の縦書きの原稿
 const plain = () => ({ items: st.items.map(i => ({ type: i.type, text: i.text, who: i.who })), cast: st.cast, guests: st.guests });
 const snap = () => JSON.stringify(plain());
 function restore(s) { const o = JSON.parse(s); st.items = o.items.map(mk); st.cast = o.cast; st.guests = o.guests || []; }
@@ -72,14 +73,14 @@ export const currentFolder = () => (active && cur ? cur.folder : null);
 // 書きかけの文字を今すぐ端末に保存する（同期の前に呼ぶ）
 export function flushSave() { if (active && cur) save(); }
 // 同期で原稿の中身が差し替わった：保存せずに（古い中身で上書きしないよう）開き直す
-export function reloadEditor() { if (!active || !cur) return; clearTimeout(saveT); const { doc, folder } = cur; const sl = cv.scrollLeft; openEditor(doc, folder); cv.scrollLeft = sl; lastSl = sl; }
+export function reloadEditor() { if (!active || !cur) return; clearTimeout(saveT); const { doc, folder } = cur; const sl = getSL(); openEditor(doc, folder); putSL(sl); lastSl = sl; }
 export function openEditor(doc, folder) {
   const p = parseDoc(doc.text, folder.cast);
   cur = { doc, folder, meta: p.meta, castJson: JSON.stringify(folder.cast) };
   st = { items: p.items.map(mk), cast: folder.cast, guests: p.guests };
   sel = new Set(); undo.length = 0; redo.length = 0; editing = null; lock = null; g = null;
   active = true; closeLayer(); closePop();
-  allowJumpFor(500); render(); cv.scrollLeft = 0; lastSl = 0;
+  allowJumpFor(500); render(); putSL(0); lastSl = 0;
   if (p.added) save();
 }
 export function closeEditor() {
@@ -87,7 +88,7 @@ export function closeEditor() {
   if (editing) finishEdit();
   closePop(); closeLayer(); save();
   active = false; cur = null; lock = null; g = null; sel.clear();
-  cv.innerHTML = '';
+  sheet.innerHTML = '';
 }
 
 const fmt = s => esc(s).replace(/(^|[^0-9])([0-9]{2})(?![0-9])/g, '$1<span class="tcy">$2</span>').replace(/(!\?|\?!|!!|\?\?)/g, '<span class="tcy">$1</span>');
@@ -96,9 +97,20 @@ const who = id => st.guests.find(c => c.id === id) || st.cast.find(c => c.id ===
 function chipBtn(c, on, fn) { const b = btn(c.name, fn, 'chip' + (on ? ' on' : '')); b.style.setProperty('--c', c.color); return b; }
 
 /* ---- 横スクロールの位置 ----
-   縦書きなので scrollLeft は 0＝書き出し（右端）で、左へ進むほど負になる */
-const getSL = () => cv.scrollLeft;
-const setSL = v => { cv.scrollLeft = v; lastSl = cv.scrollLeft; }; // アプリが動かした位置は、正しい位置として覚える
+   アプリの中では 0＝書き出し（右端）で、左へ進むほど負として扱う */
+// スクロールする箱そのものは横書きにしてある（縦書きの箱をスクロールさせると、iPhone・iPad が位置を何度も 0＝先頭へ書き換えた）。
+// 箱の中での位置（scrollLeft）は左端が 0 で右へ増えるので、ここで「書き出し（右端）が 0、左へ進むほど負」に直して使う
+const maxSL = () => Math.max(0, cv.scrollWidth - cv.clientWidth);
+const getSL = () => cv.scrollLeft - maxSL();
+const putSL = v => { cv.scrollLeft = v + maxSL(); };                 // 動かすだけ
+const setSL = v => { putSL(v); lastSl = getSL(); }; // アプリが動かした位置は、正しい位置として覚える
+// 原稿の幅が変わったとき（列が増えた・減った、字の読み込みなど）、箱の中の位置は左端から数えるので、そのままだと見ている所がずれる。
+// 書き出し（右端）から数えた位置を保つよう、覚えている位置へ合わせ直す
+let sheetW = 0;
+new ResizeObserver(() => {
+  const w = sheet.offsetWidth; if (w === sheetW) return; sheetW = w;
+  if (active && Math.abs(getSL() - lastSl) > 1) putSL(lastSl);
+}).observe(sheet);
 
 /* ---- 描画 ---- */
 const leadPage = () => st.items.length && st.items[0].type !== 'div' ? 1 : 0;
@@ -118,10 +130,10 @@ function render() {
   });
   if (!editing) h += slot(st.items.length) + '<div class="newcol" role="button" tabindex="0">ここをタップして書く</div>';
   // 中身を入れ替えても横の位置を保つ
-  const sl = cv.scrollLeft;
-  cv.innerHTML = h + '<div class="tail" aria-hidden="true"></div>';
-  cv.scrollLeft = sl; lastSl = cv.scrollLeft;
-  if (typeof dlog === 'function') dlog(`render ${Math.round(sl)}→${Math.round(cv.scrollLeft)} w=${cv.scrollWidth}`);
+  const sl = getSL();
+  sheet.innerHTML = h + '<div class="tail" aria-hidden="true"></div>';
+  putSL(sl); lastSl = getSL();
+  if (typeof dlog === 'function') dlog(`render ${Math.round(sl)}→${Math.round(getSL())} w=${cv.scrollWidth}`);
   const ta = $('inl');
   if (ta) { ta.value = st.items[idx(editing.id)].text; fitTa(); }
   posTicks = null; drawPos();
@@ -247,8 +259,8 @@ window.addEventListener('app-resize', () => {
   }
   anchor = null;
   keepVisible();
-  if (hold && Date.now() < hold.until) hold.v = cv.scrollLeft; // キーボードが閉じて枠の幅が変わった分は、合わせた位置を新しい基準に
-  lastSl = cv.scrollLeft; // アプリが合わせた位置を正しい位置として覚える
+  if (hold && Date.now() < hold.until) hold.v = getSL(); // キーボードが閉じて枠の幅が変わった分は、合わせた位置を新しい基準に
+  lastSl = getSL(); // アプリが合わせた位置を正しい位置として覚える
   drawPos();
 });
 function pickAnchor() {
@@ -262,9 +274,9 @@ function fitTa() {
   // 枠の上下の余白（通常とキーボード表示中で違う）を引いた分を入力欄の高さにする
   const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + 2;
   // 幅を測るため一瞬細くするとスクロール位置が詰められることがあるので、前後で位置を保つ
-  const sl = cv.scrollLeft;
+  const sl = getSL();
   ta.style.height = Math.max(60, blk.clientHeight - pad) + 'px'; ta.style.width = '1.9em'; ta.style.width = Math.max(ta.scrollWidth, 30) + 'px';
-  if (cv.scrollLeft !== sl) cv.scrollLeft = sl;
+  if (Math.abs(getSL() - sl) > .5) putSL(sl);
 }
 // 書いている枠が画面からはみ出しそうなときだけ動かす。
 // 左へはみ出しそう（最後尾で書いていて列が増えたなど）なら、左端に詰めず、画面の左から30%あたりまで寄せて余裕を作る
@@ -276,7 +288,7 @@ function keepVisible() {
     if (r.right - d > c.right - 8) d = r.right - (c.right - 8); // 書き出し（右端）は画面内に残す
     setSL(getSL() + d);
   } else if (r.right > c.right) setSL(getSL() + r.right - c.right);
-  lastSl = cv.scrollLeft;
+  lastSl = getSL();
   if (lock) lock.dx = editDx(); // アプリが動かした位置を、新しい固定位置にする
 }
 // 書いている枠の右端（セリフの書き出し側）が、画面の右端からどれだけ離れているか
@@ -285,7 +297,7 @@ function editDx() { const b = cv.querySelector('.blk.editing'); return b ? b.get
 function pin() {
   const d = editDx(); if (d == null || !lock) return;
   if (Math.abs(d - lock.dx) > 1) setSL(getSL() + d - lock.dx);
-  lastSl = cv.scrollLeft;
+  lastSl = getSL();
 }
 // 書き始めはキーボードが開く瞬間。iOS が勝手にスクロールしても、タップした枠を画面上のその位置に留める
 let lock = null;
@@ -323,7 +335,7 @@ function applyEdit() {
 // 書き終えた直後は、入力欄がなくなったりキーボードが閉じたりして iOS がスクロール位置を勝手に戻すことがある。
 // 1.5秒の間は、指で動かしていないのに位置が変わったら、書き終えたときの位置に戻す（セリフを引き寄せたりはしない）
 let hold = null;
-function finishEdit() { if (!editing) return; applyEdit(); render(); hold = { v: cv.scrollLeft, until: Date.now() + 1500 }; }
+function finishEdit() { if (!editing) return; applyEdit(); render(); hold = { v: getSL(), until: Date.now() + 1500 }; }
 function nextSerifu() { if (!editing) return; const last = applyEdit(); const before = snap(); const it = mk({ type: 'line' }); st.items.splice(last + 1, 0, it); startEdit(it.id, true, before); }
 
 /* ---- キャラ表 ---- */
@@ -492,7 +504,7 @@ let posDrag = false;
 function posJump(x) {
   const tr = $('pos').querySelector('.track').getBoundingClientRect(); if (!tr.width) return;
   const ratio = Math.min(1, Math.max(0, (tr.right - x) / tr.width));
-  allowJumpFor(400); setSL(-(ratio * cv.scrollWidth - cv.clientWidth / 2)); lastSl = cv.scrollLeft;
+  allowJumpFor(400); setSL(-(ratio * cv.scrollWidth - cv.clientWidth / 2)); lastSl = getSL();
   if (lock) lock.dx = editDx();
   drawPos();
 }
@@ -559,14 +571,14 @@ function dlog(s) {
   if (!el) { el = document.createElement('pre'); el.id = 'dbg'; el.style.cssText = 'position:fixed;left:4px;top:24px;z-index:99;pointer-events:none;margin:0;padding:4px 6px;font:10px/1.35 monospace;background:rgba(0,0,0,.72);color:#9f9;border-radius:6px;max-width:70vw;white-space:pre-wrap'; document.body.appendChild(el); }
   dbgLines.push(((Date.now() - dbgT0) / 1000).toFixed(2) + ' ' + s); if (dbgLines.length > 16) dbgLines.shift(); el.textContent = dbgLines.join('\n');
 }
-window.addEventListener('pointerdown', e => { if (e.target.closest && e.target.closest('.grip')) { dbgT0 = Date.now(); dbgLines.length = 0; dlog('down sl=' + Math.round(cv.scrollLeft)); } }, true);
+window.addEventListener('pointerdown', e => { if (e.target.closest && e.target.closest('.grip')) { dbgT0 = Date.now(); dbgLines.length = 0; dlog('down sl=' + Math.round(getSL())); } }, true);
 cv.addEventListener('scroll', () => {
   if (!active) return;
   if (coasting) { clearTimeout(coastT); coastT = setTimeout(() => { coasting = false; }, 150); } // 惰性が続いている
-  const sl = cv.scrollLeft;
+  const sl = getSL();
   if (DBG) dlog(`scr ${Math.round(sl)} last=${Math.round(lastSl)} want=${g && g.want != null ? Math.round(g.want) : '-'} hold=${hold && Date.now() < hold.until ? Math.round(hold.v) : '-'} u=${userScrolling() ? 1 : 0}${fingerDown ? 'F' : ''}${fingerMoved ? 'M' : ''}${coasting ? 'C' : ''} ed=${editing ? 1 : 0} act=${document.activeElement && document.activeElement.className || document.activeElement && document.activeElement.tagName}`);
   if (g && (g.kind === 'drag' || g.kind === 'pick')) {
-    if (Math.abs(sl - g.want) > 2) { cv.scrollLeft = g.want; return; } // 移動・選択の間は、いるべき位置から動かさない
+    if (Math.abs(sl - g.want) > 2) { putSL(g.want); return; } // 移動・選択の間は、いるべき位置から動かさない
   } else if (editing && lock) {
     if (userScrolling()) lock.dx = editDx();   // 人が動かした → その位置を新しい固定位置に
     else if (Math.abs(editDx() - lock.dx) > 1) {
@@ -576,9 +588,9 @@ cv.addEventListener('scroll', () => {
       else { reverts.push(now); pin(); return; }
     }
   } else if (hold && Date.now() < hold.until && !userScrolling() && Math.abs(sl - hold.v) > 2) {
-    cv.scrollLeft = hold.v; return; // 書き終えた直後の勝手な移動は戻す
+    putSL(hold.v); return; // 書き終えた直後の勝手な移動は戻す
   } else if (!userScrolling() && Math.abs(sl - lastSl) > 2) { // 人もアプリも動かしていないのに動いた → どれだけ小さくても戻す
-    cv.scrollLeft = lastSl; return;
+    putSL(lastSl); return;
   }
   lastSl = sl;
   drawPos();
@@ -589,7 +601,7 @@ let g = null;
 const pt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest ? el : null; };
 // 移動・選択の間は、iOS が横の位置を勝手に 0（先頭）へ書き換えることがある（読むと 0 になる）。
 // そこで位置は読み直さず、押した時の位置にアプリが動かした分だけを足した「いるべき位置」（g.want）を持っておく
-const clampSL = v => Math.max(-(cv.scrollWidth - cv.clientWidth), Math.min(0, v));
+const clampSL = v => Math.max(-maxSL(), Math.min(0, v));
 function autoScroll(x, y) {
   if (Math.hypot(x - g.x0, y - g.y0) < 30) return; const rc = cv.getBoundingClientRect();
   const d = x < rc.left + 32 ? -14 : x > rc.right - 32 ? 14 : 0; if (!d) return;
@@ -671,15 +683,15 @@ function end(cancel) {
 let gestureEnd = 0;
 function afterGesture() { gestureEnd = Date.now(); }
 // 描き直したあと、いるべき位置へ戻す（iOS が書き換えた 0 を使わない）。次の描画でももう一度
-function restorePos(v) { setSL(v); hold = { v, until: Date.now() + 1500 }; lastSl = v; requestAnimationFrame(() => { if (Math.abs(cv.scrollLeft - v) > 2) setSL(v); }); dlog(`restore ${Math.round(v)} → ${Math.round(cv.scrollLeft)}`); }
-function holdPos() { hold = { v: cv.scrollLeft, until: Date.now() + 1500 }; lastSl = cv.scrollLeft; }
+function restorePos(v) { setSL(v); hold = { v, until: Date.now() + 1500 }; lastSl = v; requestAnimationFrame(() => { if (Math.abs(getSL() - v) > 2) setSL(v); }); dlog(`restore ${Math.round(v)} → ${Math.round(getSL())}`); }
+function holdPos() { hold = { v: getSL(), until: Date.now() + 1500 }; lastSl = getSL(); }
 const justGestured = () => Date.now() - gestureEnd < 500;
-cv.addEventListener('touchend', e => { dlog(`touchend jg=${justGestured() ? 1 : 0} can=${e.cancelable ? 1 : 0} sl=${Math.round(cv.scrollLeft)}`); if (justGestured() && e.cancelable) e.preventDefault(); }, { passive: false });
-['click', 'mousedown', 'focusin', 'focusout'].forEach(t => document.addEventListener(t, e => { dlog(`${t} ${e.target.className || e.target.tagName} sl=${Math.round(cv.scrollLeft)}`); }, true));
-['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, () => { if (g && g.kind === 'drag') dlog(`${t} sl=${Math.round(cv.scrollLeft)} drop=${g.drop ? g.drop.kind : '-'}`); }, true));
+cv.addEventListener('touchend', e => { dlog(`touchend jg=${justGestured() ? 1 : 0} can=${e.cancelable ? 1 : 0} sl=${Math.round(getSL())}`); if (justGestured() && e.cancelable) e.preventDefault(); }, { passive: false });
+['click', 'mousedown', 'focusin', 'focusout'].forEach(t => document.addEventListener(t, e => { dlog(`${t} ${e.target.className || e.target.tagName} sl=${Math.round(getSL())}`); }, true));
+['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, () => { if (g && g.kind === 'drag') dlog(`${t} sl=${Math.round(getSL())} drop=${g.drop ? g.drop.kind : '-'}`); }, true));
 ['click', 'mousedown', 'focusin'].forEach(t => document.addEventListener(t, e => {
   if (!justGestured() || !e.target.closest || !e.target.closest('#canvas')) return;
-  if (t === 'focusin') { if (!e.target.closest('textarea')) { e.target.blur && e.target.blur(); cv.scrollLeft = hold ? hold.v : lastSl; } return; }
+  if (t === 'focusin') { if (!e.target.closest('textarea')) { e.target.blur && e.target.blur(); putSL(hold ? hold.v : lastSl); } return; }
   e.preventDefault(); e.stopPropagation();
 }, true));
 window.addEventListener('pointerup', () => end(false));
