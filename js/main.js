@@ -1,8 +1,10 @@
 // 起動と、一覧⇔編集の切り替え
-import { $, toast } from './ui.js?v=8';
-import * as db from './db.js?v=8';
-import { openEditor, closeEditor, setOnBack, SAMPLE, SAMPLE_CAST } from './editor.js?v=8';
-import { initList, renderList, newDoc } from './list.js?v=8';
+import { $, toast } from './ui.js?v=10';
+import * as db from './db.js?v=10';
+import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=10';
+import { initList, renderList, newDoc } from './list.js?v=10';
+import * as sync from './sync.js?v=10';
+import { finishSignIn } from './dropbox.js?v=10';
 
 const state = { folders: [], docs: [] };
 
@@ -22,7 +24,18 @@ function showList() {
   $('editview').hidden = true; $('listview').hidden = false;
   document.querySelector('header').hidden = false;
   renderList();
+  sync.sync(); // 一覧を開いたときに Dropbox の変更を取り込む
 }
+const listShown = () => !$('listview').hidden;
+
+// 同期で何か変わったとき：一覧なら描き直す。開いている原稿の中身が差し替わったら開き直す
+sync.onChange(ev => {
+  if (listShown()) { if (!$('layer').innerHTML) renderList(); return; }
+  const cd = currentDoc();
+  if (ev.removed && ev.removed === cd) { showList(); toast('この原稿は別の端末で消されました'); return; }
+  if ((ev.replaced && ev.replaced === cd) || (ev.cast && ev.cast === currentFolder())) reloadEditor();
+  if (ev.conflict && ev.replaced === cd) toast(`別の端末の版と食い違ったので、この端末の版を「${ev.conflict.name}」に残しました`);
+});
 
 // キーボードが出たら、画面全体を「見えている範囲」に合わせて縮める（仕様書 5-2）。
 // iOS はキーボードを出すとき画面ごと押し上げてスクロールさせるので、見えている範囲に貼りつけて追いかける
@@ -59,10 +72,14 @@ async function boot() {
     folders = [f]; docs = [d];
   }
   state.folders = folders; state.docs = docs;
+  // Dropbox のログインから戻ってきたところなら、ログインを仕上げる
+  let justSignedIn = false;
+  try { justSignedIn = await finishSignIn(); if (justSignedIn) toast('Dropbox につなぎました'); } catch (e) { toast(e.message); }
+  await sync.init(state); sync.setFlush(flushSave);
   initList(state, showEditor);
   setOnBack(showList);
-  const d = last && docs.find(x => x.id === last);
-  d ? showEditor(d) : showList();
+  const d = !justSignedIn && last && docs.find(x => x.id === last);
+  d ? (showEditor(d), sync.sync()) : showList();
 }
 boot().catch(e => { console.error(e); toast('端末の保存領域を開けませんでした'); });
 

@@ -167,3 +167,15 @@ button,.slot,.newcol,.who{touch-action:manipulation}
 #pop .pop-sep{flex-basis:100%;height:0;border-top:1px dashed var(--rule);margin:2px 0}
 #pop button.chip.add{border-style:dashed;color:var(--accent);font-weight:700}
 #pop input{font:inherit;font-size:16px;padding:8px 10px;border-radius:8px;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);min-width:0;flex:1 1 10em}
+/* 手順3：同期の印と状態 */
+.sm{display:inline-block;width:1.3em;margin-right:4px;text-align:center;font-family:var(--f-ui);font-size:13px;font-weight:700}
+.sm.synced{color:var(--muted)}
+.sm.pending{color:var(--accent)}
+.sm.conflict{color:var(--warn)}
+#hdr button.dbx.error,#hdr button.dbx.offline{color:var(--warn)}
+#pos .sync{font-size:10px;color:var(--muted);white-space:nowrap;letter-spacing:.02em}
+#pos .sync:empty{display:none}
+#pos .sync.conflict,#pos .sync.error{color:var(--warn);font-weight:700}
+#pos .sync.busy,#pos .sync.pending{color:var(--accent)}
+.sheet .clash{border-top-color:var(--warn)}
+.sheet .clash h3{color:var(--warn)}

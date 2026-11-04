@@ -1,8 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=8';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=8';
-import * as db from './db.js?v=8';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=10';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=10';
+import * as db from './db.js?v=10';
+import * as sync from './sync.js?v=10';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -44,9 +45,12 @@ function save() {
   const items = st.items.map(i => editing && ta && i.id === editing.id ? { ...i, text: ta.value } : i);
   cur.folder.cast = st.cast;
   const text = serializeDoc({ title: cur.doc.name, meta: cur.meta, guests: st.guests, items }, st.cast);
-  if (text !== cur.doc.text) { cur.doc.text = text; cur.doc.updated = Date.now(); cur.doc.stats = docStats(items); }
+  let changed = false;
+  if (text !== cur.doc.text) { cur.doc.text = text; cur.doc.updated = Date.now(); cur.doc.stats = docStats(items); cur.doc.dirty = true; changed = true; }
+  // キャラ表（レギュラー）が変わっていたら、作品フォルダの _cast.json も送る
+  const cj = JSON.stringify(st.cast); if (cj !== cur.castJson) { cur.castJson = cj; cur.folder.castDirty = true; changed = true; }
   const doc = cur.doc, folder = cur.folder;
-  db.saveDoc(doc, folder).then(() => { if (failed) { failed = false; db.unstash(doc.id); } }, e => {
+  db.saveDoc(doc, folder).then(() => { if (failed) { failed = false; db.unstash(doc.id); } if (changed) sync.schedule(); }, e => {
     console.error(e); failed = true;
     // IndexedDB がだめでも消さない：退避しておき、次の保存か次の起動で戻す
     toast(db.stash(doc, folder) ? '端末への保存をやり直します（' + (e && e.name || '不明') + '）' : '端末への保存に失敗しました（' + (e && e.name || '不明') + '）');
@@ -62,9 +66,16 @@ window.addEventListener('pagehide', () => { if (active) save(); });
 
 let onBack = null;
 export function setOnBack(fn) { onBack = fn; }
+// 開いている原稿（同期で中身が差し替わったときに開き直すため）
+export const currentDoc = () => (active && cur ? cur.doc : null);
+export const currentFolder = () => (active && cur ? cur.folder : null);
+// 書きかけの文字を今すぐ端末に保存する（同期の前に呼ぶ）
+export function flushSave() { if (active && cur) save(); }
+// 同期で原稿の中身が差し替わった：保存せずに（古い中身で上書きしないよう）開き直す
+export function reloadEditor() { if (!active || !cur) return; clearTimeout(saveT); const { doc, folder } = cur; const sl = cv.scrollLeft; openEditor(doc, folder); cv.scrollLeft = sl; lastSl = sl; }
 export function openEditor(doc, folder) {
   const p = parseDoc(doc.text, folder.cast);
-  cur = { doc, folder, meta: p.meta };
+  cur = { doc, folder, meta: p.meta, castJson: JSON.stringify(folder.cast) };
   st = { items: p.items.map(mk), cast: folder.cast, guests: p.guests };
   sel = new Set(); undo.length = 0; redo.length = 0; editing = null; lock = null; g = null;
   active = true; closeLayer(); closePop();
@@ -429,6 +440,7 @@ cv.addEventListener('scroll', () => { if (!$('pop-g')) closePop(); }); // ゲス
 /* ---- 上の細い位置表示 ----
    線全体＝原稿全体（右が書き出し）。濃い部分＝いま画面に見えている範囲。目盛り＝ページの区切り。右に今のページ番号 */
 let posTicks = null, posRaf = 0;
+sync.onChange(() => { if (active) drawSync(); });
 function drawPos() {
   if (posRaf) return;
   posRaf = requestAnimationFrame(() => { posRaf = 0; drawPosNow(); });
@@ -447,6 +459,15 @@ function drawPosNow() {
   const mid = from + V / 2, n = posTicks.filter(d => d <= mid).length;
   const lead = leadPage(), total = posTicks.length + lead; // 最初の区切りより前にセリフがあれば、そこが P1
   box.querySelector('.pg').textContent = posTicks.length ? `P${Math.max(1, n + lead)} / ${total}` : '';
+  drawSync();
+}
+// 同期の状態（上の線の右端、ページ番号の横）。Dropbox にログインしていなければ出さない
+const SYNC_LABEL = { synced: '保存済み', pending: '送信待ち', busy: '送信中', offline: 'オフライン・端末に保存済み', conflict: '衝突あり', error: '送信できません' };
+function drawSync() {
+  const el = $('pos') && $('pos').querySelector('.sync'); if (!el || !cur) return;
+  const s = sync.docState(cur.doc);
+  const k = !s ? '' : s === 'conflict' ? 'conflict' : sync.status === 'offline' ? 'offline' : sync.status === 'error' ? 'error' : sync.status === 'busy' && s === 'pending' ? 'busy' : s;
+  el.textContent = k ? SYNC_LABEL[k] : ''; el.className = 'sync ' + k; el.title = k === 'error' ? sync.lastError : '';
 }
 
 /* ---- 勝手なスクロールを防ぐ ----

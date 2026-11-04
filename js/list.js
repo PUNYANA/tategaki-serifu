@@ -1,7 +1,8 @@
 // 原稿一覧：作品フォルダごとに原稿を並べる（更新順）
-import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=8';
-import { serializeDoc, docStats, setTitle } from './textfile.js?v=8';
-import * as db from './db.js?v=8';
+import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=10';
+import { serializeDoc, docStats, setTitle } from './textfile.js?v=10';
+import * as db from './db.js?v=10';
+import * as sync from './sync.js?v=10';
 
 let S = null, onOpen = null;
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -41,12 +42,21 @@ export function initList(state, open) {
   });
 }
 
+// 同期の印。文字の説明だけでなく形でも区別する（仕様書 5-1）
+const MARK = { synced: ['✓', '同期済み'], pending: ['↑', '未送信あり'], conflict: ['⚠', '衝突あり'] };
+const mark = d => { const s = sync.docState(d); return s ? `<span class="sm ${s}" title="${MARK[s][1]}" aria-label="${MARK[s][1]}">${MARK[s][0]}</span>` : ''; };
+// 右上の Dropbox ボタンに出す、全体の同期の状態
+const STATUS = { idle: ['✓', '同期済み'], busy: ['↻', '送信中'], offline: ['⦸', 'オフライン・端末に保存済み'], error: ['!', '送信できません'], local: ['', 'つないでいません'] };
+
 export function renderList() {
-  const hdr = $('hdr'); hdr.innerHTML = ''; hdr.append(btn('＋ フォルダ', newFolder));
+  const hdr = $('hdr'); hdr.innerHTML = '';
+  const st = sync.signedIn() ? (S.docs.some(d => sync.docState(d) === 'conflict') && sync.status === 'idle' ? ['⚠', '衝突あり'] : STATUS[sync.status]) : STATUS.local;
+  const db_ = btn(`${st[0] ? st[0] + ' ' : ''}Dropbox`, dbxSheet, 'dbx ' + sync.status); db_.setAttribute('aria-label', 'Dropbox：' + st[1]);
+  hdr.append(db_, btn('＋ フォルダ', newFolder));
   const folders = [...S.folders].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   $('listview').innerHTML = folders.map(f => {
     const docs = S.docs.filter(d => d.folder === f.name).sort((a, b) => b.updated - a.updated);
-    const rows = docs.map(d => `<li class="doc"><button type="button" class="open" data-open="${d.id}"><span class="dn">${esc(d.name)}</span>`
+    const rows = docs.map(d => `<li class="doc"><button type="button" class="open" data-open="${d.id}"><span class="dn">${mark(d)}${esc(d.name)}</span>`
       + `<span class="dm">${fmtDate(d.updated)}　セリフ ${d.stats.lines}　${d.stats.chars}字</span></button>`
       + `<button type="button" class="more" data-more="${d.id}" aria-label="${esc(d.name)}の操作">…</button></li>`).join('');
     return `<section class="fold"><div class="fh"><h2>${esc(f.name)}</h2><span class="sp"></span><button type="button" data-new="${esc(f.name)}">＋ 原稿</button></div>`
@@ -70,14 +80,14 @@ function nameSheet({ title, value, ok, check, done }) {
 function newDocSheet(folder) {
   nameSheet({
     title: `「${folder}」に原稿を作る`, value: uniqueName(folder, '無題'), ok: '作る', check: docCheck(folder, null),
-    done: async v => { const d = newDoc(folder, v); S.docs.push(d); await db.put('docs', d); onOpen(d); },
+    done: async v => { const d = newDoc(folder, v); S.docs.push(d); await db.put('docs', d); sync.schedule(); onOpen(d); },
   });
 }
 function newFolder() {
   nameSheet({
     title: 'フォルダを作る', value: '', ok: '作る',
     check: v => badName(v) || (S.folders.some(f => same(f.name, v)) ? '同じ名前のフォルダがあります' : ''),
-    done: async v => { const f = { name: v, cast: [], created: Date.now() }; S.folders.push(f); await db.put('folders', f); renderList(); toast('フォルダを作りました'); },
+    done: async v => { const f = { name: v, cast: [], created: Date.now() }; S.folders.push(f); await db.put('folders', f); sync.schedule(); renderList(); toast('フォルダを作りました'); },
   });
 }
 
@@ -89,30 +99,64 @@ function docMenu(d, confirming = false) {
       <div class="row"><span class="sp"></span><button type="button" id="dm-no">やめる</button><button type="button" class="danger" id="dm-yes">削除する</button></div></div></div>`;
     $('dm-no').onclick = () => docMenu(d);
     $('dm-yes').onclick = async () => {
-      S.docs.splice(S.docs.indexOf(d), 1); await db.del('docs', d.id);
+      S.docs.splice(S.docs.indexOf(d), 1); await db.del('docs', d.id); await sync.removed(d);
       if ((await db.getMeta('last')) === d.id) await db.setMeta('last', null);
       closeLayer(); renderList(); toast('削除しました');
     };
     bgClose(closeLayer); return;
   }
+  // 衝突しているときは、どちらの版を残すかを選べる（残さないほうは消える。Dropbox のゴミ箱からは戻せる）
+  const pair = sync.partners(d);
+  const clash = pair.length ? `<section class="clash"><h3>⚠ 衝突しています</h3>
+      <p>${sync.isCopy(d) ? `「${esc(pair[0].name)}」（Dropbox の版）と` : `${pair.map(x => `「${esc(x.name)}」`).join('、')}と`}食い違っています。見比べて、残すほうを選んでください。</p>
+      <div class="row"><button type="button" class="pri" id="dm-keep">この版を残す</button></div>
+      <p>${sync.isCopy(d) ? 'この版の中身を、元の名前の原稿に移します。' : '別の版を消します。'}</p></section>` : '';
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="原稿の操作">
-    <h2>${esc(d.name)}</h2><p>${esc(d.folder)}　${fmtDate(d.updated)}　セリフ ${d.stats.lines}　${d.stats.chars}字</p>
+    <h2>${esc(d.name)}</h2><p>${esc(d.folder)}　${fmtDate(d.updated)}　セリフ ${d.stats.lines}　${d.stats.chars}字</p>${clash}
     <section><h3>名前を変える</h3><div class="row"><input type="text" id="dm-name" name="doc-title" value="${esc(d.name)}" aria-label="原稿のタイトル" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1" enterkeyhint="done"><button type="button" id="dm-ren">変更</button></div><p class="err" id="dm-err"></p></section>
     <section><div class="row"><button type="button" id="dm-dup">複製</button><button type="button" class="danger" id="dm-del">削除</button><span class="sp"></span><button type="button" class="pri" id="dm-close">閉じる</button></div></section>
   </div></div>`;
   const rename = async () => {
     const v = $('dm-name').value.trim(); if (v === d.name) { closeLayer(); return; }
     const e = docCheck(d.folder, d)(v); if (e) { $('dm-err').textContent = e; return; }
-    d.name = v; d.text = setTitle(d.text, v); d.updated = Date.now(); await db.put('docs', d);
+    d.name = v; d.text = setTitle(d.text, v); d.updated = Date.now(); d.dirty = true; await db.put('docs', d); sync.schedule();
     closeLayer(); renderList(); toast('名前を変えました');
   };
+  if (pair.length) $('dm-keep').onclick = async () => { const k = await sync.resolve(d); closeLayer(); renderList(); toast(`「${k.name}」の1本にしました`); };
   $('dm-ren').onclick = rename;
   $('dm-name').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); rename(); } };
   $('dm-dup').onclick = async () => {
     const name = uniqueName(d.folder, d.name + 'のコピー');
-    const c = { ...d, id: genId(), name, text: setTitle(d.text, name), updated: Date.now(), stats: { ...d.stats } };
-    S.docs.push(c); await db.put('docs', c); closeLayer(); renderList(); toast('複製しました');
+    const c = { id: genId(), folder: d.folder, name, text: setTitle(d.text, name), updated: Date.now(), stats: { ...d.stats } }; // 同期の情報（path・rev）は引き継がない
+    S.docs.push(c); await db.put('docs', c); sync.schedule(); closeLayer(); renderList(); toast('複製しました');
   };
   $('dm-del').onclick = () => docMenu(d, true);
   $('dm-close').onclick = closeLayer; bgClose(closeLayer);
+}
+
+/* ---- Dropbox（右上のボタン） ---- */
+function dbxSheet() {
+  const when = t => t ? fmtDate(t) : 'まだ';
+  let body;
+  if (!sync.configured()) {
+    body = `<p>Dropbox の App key がまだ設定されていません（js/config.js）。</p>`;
+  } else if (!sync.signedIn()) {
+    body = `<p>つなぐと、原稿を Dropbox の「アプリ/縦書きセリフ帳」フォルダに普通のテキストファイルとして保存し、ほかの端末と同期します。つながなくても、この端末の中だけで使えます。</p>
+      <div class="row"><button type="button" class="pri" id="dx-in">Dropbox につなぐ</button></div>`;
+  } else {
+    const label = { idle: '同期済み', busy: '送信中', offline: 'オフライン・端末に保存済み', error: '送信できません', local: '' }[sync.status] || '';
+    const n = S.docs.filter(d => sync.docState(d) === 'conflict').length;
+    body = `<p>状態：<b>${label}</b>　最後に同期：${when(sync.lastSync)}</p>`
+      + (sync.status === 'error' && sync.lastError ? `<p class="err">${esc(sync.lastError)}</p>` : '')
+      + (n ? `<p class="err">⚠ 衝突している原稿があります（${n}本）。一覧の「…」から、残す版を選んでください。</p>` : '')
+      + `<div class="row"><button type="button" class="pri" id="dx-now">今すぐ同期</button><span class="sp"></span><button type="button" id="dx-out">ログアウト</button></div>
+      <p>ログアウトしても、この端末の原稿は消えません。</p>`;
+  }
+  $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="Dropbox"><h2>Dropbox</h2>${body}
+    <div class="row"><span class="sp"></span><button type="button" id="dx-close">閉じる</button></div></div></div>`;
+  const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
+  on('dx-in', async () => { try { await sync.signIn(); } catch (e) { toast(e.message); } });
+  on('dx-now', async () => { closeLayer(); await sync.sync(); renderList(); toast(sync.status === 'idle' ? '同期しました' : '同期できませんでした'); });
+  on('dx-out', async () => { await sync.signOut(); closeLayer(); renderList(); toast('ログアウトしました'); });
+  on('dx-close', closeLayer); bgClose(closeLayer);
 }
