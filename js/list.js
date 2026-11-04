@@ -141,7 +141,7 @@ function dbxSheet() {
   if (!sync.configured()) {
     body = `<p>Dropbox の App key がまだ設定されていません（js/config.js）。</p>`;
   } else if (!sync.signedIn()) {
-    body = `<p>つなぐと、原稿を Dropbox の「アプリ/縦書きセリフ帳」フォルダに普通のテキストファイルとして保存し、ほかの端末と同期します。つながなくても、この端末の中だけで使えます。</p>
+    body = `<p>つなぐと、原稿を Dropbox の「アプリ」フォルダの中にある、このアプリ専用のフォルダ（Dropbox に登録したアプリの名前のフォルダ）に普通のテキストファイルとして保存し、ほかの端末と同期します。このアプリが触れるのは、そのフォルダの中だけです。つながなくても、この端末の中だけで使えます。</p>
       <div class="row"><button type="button" class="pri" id="dx-in">Dropbox につなぐ</button></div>`;
   } else {
     const label = { idle: '同期済み', busy: '送信中', offline: 'オフライン・端末に保存済み', error: '送信できません', local: '' }[sync.status] || '';
