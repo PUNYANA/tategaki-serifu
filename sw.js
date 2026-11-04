@@ -5,9 +5,9 @@
 //  ・Dropbox との通信や、更新の確認（?check=）には手を出さない
 const FILES = [
   './', './index.html', './manifest.webmanifest',
-  './css/app.css?v=24',
-  './js/main.js?v=24', './js/ui.js?v=24', './js/db.js?v=24', './js/editor.js?v=24', './js/list.js?v=24',
-  './js/textfile.js?v=24', './js/sync.js?v=24', './js/dropbox.js?v=24', './js/config.js?v=24',
+  './css/app.css?v=25',
+  './js/main.js?v=25', './js/ui.js?v=25', './js/db.js?v=25', './js/editor.js?v=25', './js/list.js?v=25',
+  './js/textfile.js?v=25', './js/sync.js?v=25', './js/dropbox.js?v=25', './js/config.js?v=25',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
 ];
 const CACHE = 'serifu-' + FILES[3].split('v=')[1];

@@ -1,8 +1,8 @@
 // 原稿一覧：作品フォルダごとに原稿を並べる（更新順）
-import { $, esc, btn, toast, closeLayer, bgClose, themeButtons } from './ui.js?v=24';
-import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=24';
-import * as db from './db.js?v=24';
-import * as sync from './sync.js?v=24';
+import { $, esc, btn, toast, closeLayer, bgClose, themeButtons } from './ui.js?v=25';
+import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=25';
+import * as db from './db.js?v=25';
+import * as sync from './sync.js?v=25';
 
 let S = null, onOpen = null;
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -37,6 +37,7 @@ export function initList(state, open) {
   $('listview').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.new != null) newDocSheet(b.dataset.new);
+    else if (b.dataset.tog != null) toggleFolder(b.dataset.tog);
     else if (b.dataset.fold != null) { const f = S.folders.find(x => x.name === b.dataset.fold); f && folderMenu(f); }
     else if (b.dataset.open) { const d = S.docs.find(x => x.id === b.dataset.open); d && onOpen(d); }
     else if (b.dataset.more) { const d = S.docs.find(x => x.id === b.dataset.more); d && docMenu(d); }
@@ -49,7 +50,13 @@ const mark = d => { const s = sync.docState(d); return s ? `<span class="sm ${s}
 // 右上の Dropbox ボタンに出す、全体の同期の状態
 const STATUS = { idle: ['✓', '同期済み'], busy: ['↻', '送信中'], offline: ['⦸', 'オフライン・端末に保存済み'], error: ['!', '送信できません'], local: ['', 'つないでいません'] };
 
+// 閉じているフォルダ（端末ごとに覚える）
+const closedKey = 'tategaki-closed';
+const closed = () => { try { return new Set(JSON.parse(localStorage.getItem(closedKey) || '[]')); } catch (e) { return new Set(); } };
+function toggleFolder(name) { const s = closed(); s.has(name) ? s.delete(name) : s.add(name); try { localStorage.setItem(closedKey, JSON.stringify([...s])); } catch (e) { } renderList(); }
+
 export function renderList() {
+  const shut = closed();
   const hdr = $('hdr'); hdr.innerHTML = '';
   const st = sync.signedIn() ? (S.docs.some(d => sync.docState(d) === 'conflict') && sync.status === 'idle' ? ['⚠', '衝突あり'] : STATUS[sync.status]) : STATUS.local;
   const db_ = btn(`${st[0] ? st[0] + ' ' : ''}Dropbox`, dbxSheet, 'dbx ' + sync.status); db_.setAttribute('aria-label', 'Dropbox：' + st[1]);
@@ -63,7 +70,8 @@ export function renderList() {
     const rows = docs.map(d => `<li class="doc"><button type="button" class="open" data-open="${d.id}"><span class="dn">${mark(d)}${esc(d.name)}</span>`
       + `<span class="dm">${fmtDate(d.updated)}　セリフ ${d.stats.lines}　${d.stats.chars}字</span></button>`
       + `<button type="button" class="more" data-more="${d.id}" aria-label="${esc(d.name)}の操作">…</button></li>`).join('');
-    return `<section class="fold"><div class="fh"><h2>${esc(f.name)}</h2><span class="sp"></span><button type="button" data-new="${esc(f.name)}">＋ 原稿</button><button type="button" class="more" data-fold="${esc(f.name)}" aria-label="${esc(f.name)}の操作">…</button></div>`
+    const c = shut.has(f.name);
+    return `<section class="fold${c ? ' closed' : ''}"><div class="fh"><button type="button" class="ftog" data-tog="${esc(f.name)}" aria-expanded="${!c}"><span class="arw" aria-hidden="true">${c ? '▸' : '▾'}</span><h2>${esc(f.name)}</h2>${c ? `<span class="cnt">${docs.length}</span>` : ''}</button><span class="sp"></span><button type="button" data-new="${esc(f.name)}">＋ 原稿</button><button type="button" class="more" data-fold="${esc(f.name)}" aria-label="${esc(f.name)}の操作">…</button></div>`
       + (docs.length ? `<ul class="docs">${rows}</ul>` : '<p class="empty">まだ原稿がありません</p>') + '</section>';
   }).join('') || '<p class="empty">右上の「＋ フォルダ」から作品フォルダを作ってください</p>';
 }

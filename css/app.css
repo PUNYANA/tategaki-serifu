@@ -245,3 +245,8 @@ input[type=checkbox]{accent-color:var(--accent)}
 body.kb.in-editor.editing .kbmove{display:block}
 #kbdone{width:auto;min-width:48px}
 .sheet textarea.yoko{height:36vh;font-size:18px}
+/* フォルダを閉じる：名前を押すと開く・閉じる */
+.fh .ftog{display:flex;align-items:center;gap:6px;border:0;background:transparent;padding:4px 2px;min-height:38px;min-width:0;flex:0 1 auto;color:var(--ink)}
+.fh .ftog .arw{font-size:12px;color:var(--muted);width:1em}
+.fh .ftog .cnt{font-size:12px;color:var(--muted);font-weight:400}
+.fold.closed .docs,.fold.closed .empty{display:none}
