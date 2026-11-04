@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=25';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=25';
-import * as db from './db.js?v=25';
-import * as sync from './sync.js?v=25';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=26';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=26';
+import * as db from './db.js?v=26';
+import * as sync from './sync.js?v=26';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -147,12 +147,14 @@ let caretT = 0;
 const stopCaret = () => { clearTimeout(caretT); clearInterval(caretT); caretT = 0; };
 [['kbup', -1], ['kbdn', 1]].forEach(([id, d]) => {
   const b = $(id);
-  b.addEventListener('pointerdown', e => {
-    e.preventDefault(); // 押しても入力欄からフォーカスを外さない（キーボードを閉じない）
-    stopCaret(); moveCaret(d);
-    caretT = setTimeout(() => { caretT = setInterval(() => moveCaret(d), 70); }, 380);
-  });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => b.addEventListener(t, stopCaret));
+  const start = () => { stopCaret(); moveCaret(d); caretT = setTimeout(() => { caretT = setInterval(() => moveCaret(d), 70); }, 380); };
+  // iPhone・iPad では pointerdown を止めてもフォーカスが外れる（書くのが終わってキーボードが閉じ、先頭へ飛んでいた）。
+  // touchstart を止めるとフォーカスが入力欄に残る
+  b.addEventListener('touchstart', e => { e.preventDefault(); start(); }, { passive: false });
+  b.addEventListener('touchend', e => { e.preventDefault(); stopCaret(); }, { passive: false });
+  b.addEventListener('touchcancel', stopCaret);
+  b.addEventListener('pointerdown', e => { e.preventDefault(); if (e.pointerType !== 'touch') start(); }); // マウスのとき
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => b.addEventListener(t, e => { if (e.pointerType !== 'touch') stopCaret(); }));
   b.addEventListener('contextmenu', e => e.preventDefault());
 });
 // 「横」：書いているセリフを横書きの入力欄で開いて直す（横書きなら iOS のカーソル・選択が普通に使える）。決めると縦書きに戻る
