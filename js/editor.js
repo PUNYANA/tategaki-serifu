@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=22';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=22';
-import * as db from './db.js?v=22';
-import * as sync from './sync.js?v=22';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=24';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=24';
+import * as db from './db.js?v=24';
+import * as sync from './sync.js?v=24';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -137,12 +137,44 @@ function render() {
 const markEditing = () => document.body.classList.toggle('editing', !!editing);
 $('kbdone').addEventListener('pointerdown', e => e.preventDefault()); // 押しても入力欄からフォーカスを外さない
 $('kbdone').addEventListener('click', () => finishEdit());
+// 「▲」「▼」：カーソルを前／次の字へ1字ずつ動かす。押し続けると続けて動く
+function moveCaret(d) {
+  const ta = $('inl'); if (!ta) return;
+  const p = d < 0 ? ta.selectionStart : ta.selectionEnd; // 範囲を選んでいたら、その端から動かす
+  const q = Math.max(0, Math.min(ta.value.length, p + d)); ta.setSelectionRange(q, q);
+}
+let caretT = 0;
+const stopCaret = () => { clearTimeout(caretT); clearInterval(caretT); caretT = 0; };
+[['kbup', -1], ['kbdn', 1]].forEach(([id, d]) => {
+  const b = $(id);
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault(); // 押しても入力欄からフォーカスを外さない（キーボードを閉じない）
+    stopCaret(); moveCaret(d);
+    caretT = setTimeout(() => { caretT = setInterval(() => moveCaret(d), 70); }, 380);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => b.addEventListener(t, stopCaret));
+  b.addEventListener('contextmenu', e => e.preventDefault());
+});
+// 「横」：書いているセリフを横書きの入力欄で開いて直す（横書きなら iOS のカーソル・選択が普通に使える）。決めると縦書きに戻る
+$('kbyoko').addEventListener('pointerdown', e => e.preventDefault());
+$('kbyoko').addEventListener('click', () => openYoko());
+function openYoko() {
+  const ta = $('inl'); if (!editing || !ta) return;
+  const pos = ta.selectionStart;
+  $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="横書きで直す"><h2>横書きで直す</h2>
+    <textarea id="yk" class="yoko" name="yoko-text" autocomplete="off" aria-label="セリフ（横書き）"></textarea>
+    <div class="row"><button type="button" id="yk-no">やめる</button><span class="sp"></span><button type="button" class="pri" id="yk-ok">縦書きに戻す</button></div></div></div>`;
+  const y = $('yk'); y.value = ta.value; y.focus(); y.setSelectionRange(pos, pos);
+  const back = v => { closeLayer(); const t = $('inl'); if (!t) return; if (v != null) { t.value = v; fitTa(); scheduleSave(); editing.dirty = true; } t.focus({ preventScroll: true }); };
+  $('yk-ok').onclick = () => back(y.value);
+  $('yk-no').onclick = () => back(null);
+}
 function paintSel() { cv.querySelectorAll('[data-i]').forEach(el => el.classList.toggle('sel', sel.has(st.items[+el.dataset.i].id))); renderBar(); }
 // 下のボタン列。話者は枠の上の名前をタップしてつける（下に話者の列は置かない）
 function renderBar() {
   const bar = $('bar'); bar.innerHTML = ''; markEditing();
   if (editing) {
-    const els = [spacer(), btn('次のセリフへ', nextSerifu, 'pri'), btn('完了', finishEdit)];
+    const els = [btn('横書きで直す', openYoko), spacer(), btn('次のセリフへ', nextSerifu, 'pri'), btn('完了', finishEdit)];
     els.forEach(b => b.addEventListener('pointerdown', e => e.preventDefault()));
     bar.append(...els); return;
   }
