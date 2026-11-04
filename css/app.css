@@ -1,0 +1,184 @@
+/* 試作版（docs/tategaki-prototype.html）のスタイルをそのまま使う */
+:root{
+  --paper:#f6f7f5; --sheet:#ffffff; --ink:#1d2330; --muted:#6b7385; --rule:#d9dee6;
+  --sel:#cfe8f3; --sel-edge:#3a8fb7; --pin:#fbe1dc; --pin-edge:#c8432f; --warn:#c8432f;
+  --bar:#eef0f2; --btn:#ffffff; --btn-fg:#1d2330; --accent:#24507a; --accent-fg:#ffffff;
+  --f-text:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-ui:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#15181e; --sheet:#1c2028; --ink:#e7e9ee; --muted:#9097a6; --rule:#2c323d;
+  --sel:#1d3a4a; --sel-edge:#6bbbe0; --pin:#46231e; --pin-edge:#ef7a66; --warn:#ef7a66;
+  --bar:#11141a; --btn:#232833; --btn-fg:#e7e9ee; --accent:#7fb3e0; --accent-fg:#10151c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#15181e; --sheet:#1c2028; --ink:#e7e9ee; --muted:#9097a6; --rule:#2c323d;
+  --sel:#1d3a4a; --sel-edge:#6bbbe0; --pin:#46231e; --pin-edge:#ef7a66; --warn:#ef7a66;
+  --bar:#11141a; --btn:#232833; --btn-fg:#e7e9ee; --accent:#7fb3e0; --accent-fg:#10151c; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-ui);overflow:hidden;-webkit-text-size-adjust:100%}
+#app{height:100%;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:12px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--rule)}
+header h1{font-family:var(--f-text);font-size:17px;margin:0;font-weight:700;letter-spacing:.08em}
+#stats{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+#hint{font-size:12px;color:var(--muted);height:1.5em;white-space:nowrap;text-overflow:ellipsis;line-height:1.5;overflow:hidden;padding-block:6px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#hint b{color:var(--ink)}
+#canvas{flex:1;min-height:0;writing-mode:vertical-rl;overflow-x:auto;overflow-y:hidden;
+  padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.blk,.div{position:relative;border-radius:6px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.blk{padding:66px 10px 58px;background:var(--sheet);border:1px solid var(--rule);border-top:4px solid var(--c,var(--rule));
+  font-family:var(--f-text);font-size:21px;line-height:1.75;letter-spacing:.06em;white-space:pre-wrap;word-break:break-all;line-break:strict;cursor:text;
+  transition:background-color .12s,border-color .12s}
+.blk.sel{background:var(--sel);border-color:var(--sel-edge);border-top-color:var(--c,var(--sel-edge))}
+.blk.lift,.div.lift{opacity:.35}
+.blk.editing{box-shadow:0 0 0 2px var(--accent) inset}
+.div{padding:40px 4px 58px;min-width:40px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;letter-spacing:.2em;border:1px dashed transparent}
+.div .lbl{display:flex;align-items:center;gap:10px;flex:1}
+.div .lbl::before,.div .lbl::after{content:"";flex:1;border-left:2px solid var(--rule)}
+.div.sel{background:var(--sel);border-color:var(--sel-edge);color:var(--ink)}
+.grip,.pick,.who{position:absolute;left:0;right:0;writing-mode:horizontal-tb;display:flex;justify-content:center;align-items:center}
+.grip{top:0;height:34px;touch-action:none;cursor:grab}
+.grip::before{content:"";width:20px;height:10px;background:radial-gradient(circle,var(--muted) 1.4px,transparent 1.6px) 0 0/5px 5px;opacity:.8}
+.who{top:32px;height:28px;padding:0 3px;cursor:pointer;border-radius:6px}
+@media (hover:hover){.blk:not(.editing) .who:hover{outline:1px dashed var(--rule);outline-offset:-3px}}
+#pop{position:fixed;z-index:35;background:var(--paper);border:1px solid var(--rule);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.2);
+  padding:8px;display:flex;flex-wrap:wrap;gap:6px;max-width:min(320px,calc(100vw - 32px));box-sizing:border-box}
+#pop button{min-height:40px;padding:6px 14px}
+.who span{max-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--f-ui);font-size:11px;font-weight:700;letter-spacing:0;
+  padding:2px 7px;border-radius:999px;border:1.5px solid var(--c,var(--rule));color:var(--ink);background:var(--sheet)}
+.who span.none{border-style:dashed;color:var(--muted);font-weight:400}
+.pick{bottom:0;height:52px;flex-direction:column;gap:3px;cursor:pointer;touch-action:none}
+.pick i{width:20px;height:20px;border-radius:50%;border:2px solid var(--muted);box-sizing:border-box;display:block}
+.sel .pick i{background:var(--sel-edge);border-color:var(--sel-edge);box-shadow:inset 0 0 0 3px var(--sheet)}
+.cnt{font-family:var(--f-ui);font-size:10px;color:var(--muted);letter-spacing:0;font-variant-numeric:tabular-nums}
+.cnt.over{color:var(--warn);font-weight:700}
+.tcy{text-combine-upright:all;-webkit-text-combine:horizontal}
+.slot{width:16px;flex:none;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;color:var(--muted);font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:4px}
+.slot span{writing-mode:horizontal-tb;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;font-family:var(--f-ui);font-weight:700;opacity:.55}
+.slot:hover span,.slot:active span{background:var(--accent);color:var(--accent-fg);opacity:1}
+.slot.drop-at{background:var(--accent)}
+.slot.drop-at span{color:var(--accent-fg);opacity:1}
+.drop-before{box-shadow:6px 0 0 0 var(--accent)}
+.drop-after{box-shadow:-6px 0 0 0 var(--accent)}
+.drop-swap{outline:2px dashed var(--pin-edge);outline-offset:-4px;background:var(--pin)!important}
+.newcol{width:64px;border:2px dashed var(--rule);border-radius:6px;display:flex;align-items:center;justify-content:center;
+  color:var(--muted);font-size:15px;letter-spacing:.25em;cursor:text;-webkit-tap-highlight-color:transparent;padding-block:20px}
+.newcol:active{background:var(--sel)}
+textarea.inl{writing-mode:vertical-rl;font-family:var(--f-text);font-size:21px;line-height:1.75;letter-spacing:.06em;color:var(--ink);
+  background:transparent;border:0;outline:0;resize:none;padding:0;margin:0;overflow:hidden;min-width:1.9em;display:block}
+#ghost{position:fixed;z-index:40;pointer-events:none;transform:translate(-50%,-120%);background:var(--sel);border:1px solid var(--sel-edge);
+  color:var(--ink);border-radius:8px;padding:6px 10px;font-family:var(--f-text);font-size:15px;display:flex;gap:8px;align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.18);white-space:nowrap}
+#ghost b{font-family:var(--f-ui);font-size:12px;background:var(--accent);color:var(--accent-fg);border-radius:999px;padding:1px 7px}
+#bar{background:var(--bar);border-top:1px solid var(--rule);padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;align-items:center}
+#bar::-webkit-scrollbar{display:none}
+#castrow{background:var(--bar);border-top:1px solid var(--rule);padding-block:8px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;align-items:center}
+#castrow::-webkit-scrollbar{display:none}
+#castrow+#bar{border-top:0}
+#castrow .lab{font-size:11px;color:var(--muted);flex:none;letter-spacing:.05em}
+#castrow button.chip{min-height:38px;padding:6px 14px;touch-action:pan-x}
+button.chip.paint{background:var(--c);color:#fff;box-shadow:0 0 0 3px var(--paper),0 0 0 5px var(--c)}
+body.painting .blk{cursor:copy}
+.blk.flash{animation:fl .35s}
+@keyframes fl{from{background:var(--sel)}}
+#canvas.panning{cursor:grabbing}
+.sp{flex:1}
+button{font-family:var(--f-ui);font-size:14px;font-weight:700;color:var(--btn-fg);background:var(--btn);border:1px solid var(--rule);flex:none;
+  border-radius:10px;padding:10px 12px;min-height:44px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button:focus-visible,.slot:focus-visible,.newcol:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.4}
+button.pri{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button.danger{color:var(--warn)}
+button.chip{border-radius:999px;border:2px solid var(--c,var(--rule));padding:8px 14px}
+button.chip.on{background:var(--c,var(--accent));color:#fff}
+button.chip.none{border-style:dashed;color:var(--muted);font-weight:400}
+.sheet-bg{position:fixed;inset:0;background:rgba(10,14,20,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.sheet{background:var(--paper);width:100%;max-width:720px;border-radius:16px 16px 0 0;padding-block:16px calc(16px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px;max-height:88%;overflow-y:auto;box-sizing:border-box}
+.sheet h2{margin:0;font-size:15px}
+.sheet h3{margin:0;font-size:13px;color:var(--muted);font-weight:700}
+.sheet section{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--rule)}
+.sheet .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sheet textarea{font-family:var(--f-text);font-size:16px;line-height:1.7;color:var(--ink);background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:10px;width:100%;box-sizing:border-box;resize:none;height:26vh}
+.sheet p{margin:0;font-size:12px;color:var(--muted);line-height:1.6}
+.sheet input[type=text],.sheet input[type=number]{font:inherit;font-size:16px;padding:8px 10px;border-radius:8px;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);min-width:0}
+.sheet label.ck{display:flex;align-items:center;gap:8px;font-size:14px;min-height:36px}
+.sheet label.ck input{width:20px;height:20px}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:10px;overflow:hidden;align-self:flex-start}
+.seg button{border:0;border-radius:0;min-height:38px}
+.seg button.on{background:var(--accent);color:var(--accent-fg)}
+.cast{display:flex;gap:8px;align-items:center}
+.cast input{flex:1}
+.swatch{width:36px;height:36px;border-radius:50%;border:3px solid var(--sheet);box-shadow:0 0 0 1px var(--rule);padding:0;min-height:0;background:var(--c)}
+.scope{font-size:12px;color:var(--muted)}
+#toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);
+  padding:8px 14px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;white-space:nowrap}
+#toast.show{opacity:1}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* ---- ここから PWA 化で足した分（一覧画面・ヘッダー） ---- */
+body{margin:0}
+[hidden]{display:none!important}
+#editview{flex:1;min-height:0;display:flex;flex-direction:column}
+header{min-height:37px}
+header h1{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#back{min-height:34px;padding:4px 10px;font-size:13px}
+#hdr{margin-left:auto;display:flex;gap:8px}
+#hdr button{min-height:34px;padding:4px 12px;font-size:13px}
+#listview{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-top:8px;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.fold{max-width:720px;margin:0 auto 24px}
+.fh{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:2px solid var(--rule)}
+.fh h2{font-family:var(--f-text);font-size:16px;margin:0;letter-spacing:.06em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fh button{min-height:38px;padding:6px 12px;font-size:13px}
+.docs{list-style:none;margin:0;padding:0}
+.doc{display:flex;align-items:stretch;border-bottom:1px solid var(--rule)}
+.doc .open{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;border:0;border-radius:0;background:transparent;padding:12px 4px;font-weight:400}
+.doc .open:active{background:var(--sel)}
+.dn{font-family:var(--f-text);font-size:16px;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dm{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.doc .more{border:0;background:transparent;width:48px;font-size:18px;color:var(--muted);border-radius:0}
+.empty{font-size:13px;color:var(--muted);padding:12px 4px;margin:0}
+.sheet p.err{color:var(--warn)}
+.sheet p.err:empty{display:none}
+/* キーボード表示中も #app を見えている範囲に合わせる（高さと位置は main.js が visualViewport から入れる） */
+#app{position:fixed;top:0;left:0;right:0;height:100%;will-change:transform}
+/* 画面に出るキーボードが出ている間（body.kb）：本文を広く使う。
+   次のセリフへ＝改行2回、完了＝キーボードの✓、話者＝枠の上の名前、で代わりになるので下の2列も隠す */
+body.kb.in-editor header,body.kb.in-editor #hint,body.kb.in-editor #castrow,body.kb.in-editor #bar{display:none}
+body.kb.in-editor #canvas{padding-block:4px}
+body.kb.in-editor .blk{padding-top:34px;padding-bottom:12px}
+body.kb.in-editor .div{padding-top:8px;padding-bottom:12px}
+body.kb.in-editor .grip,body.kb.in-editor .pick{display:none}
+body.kb.in-editor .who{top:3px}
+/* 最後尾のセリフが左端に貼りつかないよう、末尾に余白 */
+.tail{flex:none;width:min(40vw,320px);height:1px}
+#root{margin:0}
+/* 話者の列をなくしたので、下のボタンの列に上の線を戻す */
+#castrow[hidden]+#bar{border-top:1px solid var(--rule)}
+/* iPhone の幅でも下のボタンが1列に収まるよう、狭い画面では余白を詰める */
+@media (max-width:430px){#bar{gap:5px}#bar button{padding-inline:9px}}
+/* 編集画面：上のバーとヒント行は出さない。文字数も出さない */
+#hint{display:none}
+.blk{padding-bottom:44px}
+.pick{height:40px}
+#bar button.back{font-size:20px;line-height:1;padding-inline:12px}
+#bar button.ur{padding-inline:12px}
+/* ダブルタップ・ピンチで拡大しない（横スクロール・縦スクロールはそのまま） */
+html,body{touch-action:pan-x pan-y}
+button,.slot,.newcol,.who{touch-action:manipulation}
+@media (max-width:430px){#bar{gap:4px}#bar button,#bar button.back,#bar button.ur{padding-inline:8px}#bar button.ur{min-width:38px}}
+@media (max-width:430px){#bar{padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}}
+/* 上の細い位置表示 */
+#pos{display:flex;align-items:center;gap:8px;height:14px;flex:none;
+  padding-top:max(4px,env(safe-area-inset-top,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+#pos .track{position:relative;flex:1;height:2px;background:var(--rule);border-radius:1px}
+#pos .thumb{position:absolute;top:-1px;height:4px;background:var(--accent);border-radius:2px}
+#pos b{position:absolute;top:-3px;width:1px;height:8px;background:var(--muted);opacity:.7}
+#pos .pg{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:3.2em;text-align:right;letter-spacing:.02em}
+#strip{display:block;height:100%;position:relative}
+/* スマホではタップのあと「＋」が青いまま残る（:hover が残る）ので、押している間だけ青くする */
+@media (hover:none){.slot:hover:not(:active) span{background:transparent;color:inherit;opacity:.55}}
+#editview{position:relative}
