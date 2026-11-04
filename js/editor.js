@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=19';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=19';
-import * as db from './db.js?v=19';
-import * as sync from './sync.js?v=19';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=20';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=20';
+import * as db from './db.js?v=20';
+import * as sync from './sync.js?v=20';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -254,7 +254,10 @@ function pin() {
 }
 // 書き始めはキーボードが開く瞬間。iOS が勝手にスクロールしても、タップした枠を画面上のその位置に留める
 let lock = null;
-function startEdit(id, isNew = false, before = snap()) {
+function startEdit(id, isNew = false, before) {
+  // 書いている途中で別のセリフに移るときは、書いていたほうを先に確定する（しないと書いた分が消える）
+  if (editing && editing.id !== id) applyEdit();
+  if (before === undefined) before = snap();
   sel.clear(); editing = { id, before, isNew, dirty: false }; lock = null; render();
   lock = { dx: editDx() }; keepVisible();
   requestAnimationFrame(() => { pin(); keepVisible(); });

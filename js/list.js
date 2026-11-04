@@ -1,8 +1,8 @@
 // 原稿一覧：作品フォルダごとに原稿を並べる（更新順）
-import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=19';
-import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=19';
-import * as db from './db.js?v=19';
-import * as sync from './sync.js?v=19';
+import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=20';
+import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=20';
+import * as db from './db.js?v=20';
+import * as sync from './sync.js?v=20';
 
 let S = null, onOpen = null;
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
