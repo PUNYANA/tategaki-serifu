@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=15';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=15';
-import * as db from './db.js?v=15';
-import * as sync from './sync.js?v=15';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=16';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=16';
+import * as db from './db.js?v=16';
+import * as sync from './sync.js?v=16';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -212,6 +212,7 @@ window.addEventListener('app-resize', () => {
   }
   anchor = null;
   keepVisible();
+  if (hold && Date.now() < hold.until) hold.v = cv.scrollLeft; // キーボードが閉じて枠の幅が変わった分は、合わせた位置を新しい基準に
   lastSl = cv.scrollLeft; // アプリが合わせた位置を正しい位置として覚える
   drawPos();
 });
@@ -281,7 +282,10 @@ function applyEdit() {
   if (v !== it.text || e.isNew || e.dirty) { st.items.splice(i, 1, ...parts.map(t => mk({ type: 'line', text: t, who: it.who }))); pushUndo(e.before); save(); }
   return i + parts.length - 1;
 }
-function finishEdit() { if (!editing) return; applyEdit(); render(); }
+// 書き終えた直後は、入力欄がなくなったりキーボードが閉じたりして iOS がスクロール位置を勝手に戻すことがある。
+// 1.5秒の間は、指で動かしていないのに位置が変わったら、書き終えたときの位置に戻す（セリフを引き寄せたりはしない）
+let hold = null;
+function finishEdit() { if (!editing) return; applyEdit(); render(); hold = { v: cv.scrollLeft, until: Date.now() + 1500 }; }
 function nextSerifu() { if (!editing) return; const last = applyEdit(); const before = snap(); const it = mk({ type: 'line' }); st.items.splice(last + 1, 0, it); startEdit(it.id, true, before); }
 
 /* ---- キャラ表 ---- */
@@ -520,6 +524,8 @@ cv.addEventListener('scroll', () => {
       if (reverts.length >= 3) { lock.dx = editDx(); reverts = []; }
       else { reverts.push(now); pin(); return; }
     }
+  } else if (hold && Date.now() < hold.until && !userScrolling() && Math.abs(sl - hold.v) > 2) {
+    cv.scrollLeft = hold.v; return; // 書き終えた直後の勝手な移動は戻す
   } else if (!userScrolling() && Math.abs(sl - lastSl) > Math.max(400, cv.clientWidth * 0.9)) {
     cv.scrollLeft = lastSl; return;
   }

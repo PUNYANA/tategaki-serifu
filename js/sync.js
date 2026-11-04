@@ -6,9 +6,9 @@
 //  ・ログインしていなければ何もしない（端末の中だけで使える）
 // 原稿の同期用の項目： doc.path（Dropbox 上のパス）, doc.rev, doc.dirty（未送信の変更あり）
 // 作品フォルダの項目： folder.synced（Dropbox にフォルダを作った）, folder.castRev, folder.castDirty
-import * as dbx from './dropbox.js?v=15';
-import * as db from './db.js?v=15';
-import { parseDoc, docStats, setTitle } from './textfile.js?v=15';
+import * as dbx from './dropbox.js?v=16';
+import * as db from './db.js?v=16';
+import { parseDoc, docStats, setTitle } from './textfile.js?v=16';
 
 let S = null;
 const listeners = [];
@@ -96,7 +96,14 @@ export function sync(kind = 'full') {
 
 /* ---- 送る ---- */
 async function pushAll() {
-  // 1. 端末で消した原稿を Dropbox でも消す（Dropbox のゴミ箱から戻せる）
+  // 0. 端末で名前を変えたフォルダは、Dropbox でも名前を変える
+  let moves = (await db.getMeta('dbxFolderMoves')) || [];
+  for (const mv of [...moves]) {
+    try { await dbx.rpc('files/move_v2', { from_path: mv.from, to_path: mv.to, autorename: false }); }
+    catch (e) { if (!e.notFound && !e.conflict) throw e; } // 元がない・行き先がある：原稿ごとに送り直して合わせる
+    moves = moves.slice(1); await db.setMeta('dbxFolderMoves', moves);
+  }
+  // 1. 端末で消した原稿・フォルダを Dropbox でも消す（Dropbox のゴミ箱から戻せる）
   let dels = (await db.getMeta('dbxDeletes')) || [];
   for (const p of [...dels]) {
     try { await dbx.rpc('files/delete_v2', { path: p }); } catch (e) { if (!e.notFound) throw e; }
@@ -197,6 +204,7 @@ async function applyEntry(e) {
   const parts = (e.path_display || e.path_lower || '').split('/').filter(Boolean);
   const tag = e['.tag'];
   if (tag === 'folder') { if (parts.length === 1) await ensureFolder(parts[0]); return; }
+  if (tag === 'deleted' && parts.length === 1) { await remoteFolderDeleted(parts[0]); return; }
   if (parts.length !== 2) return; // 作品フォルダの直下だけ（作品フォルダの中のフォルダは今は扱わない）
   const [fname, file] = parts;
   // キャラ表（_cast.json）
@@ -241,7 +249,31 @@ async function applyEntry(e) {
   await resolveClash(local, text, meta); // 端末にも未送信の変更がある
 }
 
+// 別の端末でフォルダが消された：この端末に未送信の変更がない原稿は消す。全部消えたらフォルダも消す
+async function remoteFolderDeleted(name) {
+  const f = folderOf(name); if (!f) return;
+  for (const d of S.docs.filter(x => lower(x.folder) === lower(name))) {
+    if (d.dirty || !d.rev) { d.rev = null; d.path = null; await db.put('docs', d); continue; } // 書き足していたら残して送り直す
+    S.docs.splice(S.docs.indexOf(d), 1); await db.del('docs', d.id); emit({ removed: d });
+  }
+  if (!S.docs.some(x => lower(x.folder) === lower(name))) { S.folders.splice(S.folders.indexOf(f), 1); await db.del('folders', f.name); emit({ folders: true }); }
+  else { f.synced = false; f.castRev = null; f.castDirty = true; await db.put('folders', f); }
+}
+
 /* ---- 一覧からの操作 ---- */
+// フォルダの名前を変えた（原稿の folder はもう新しい名前になっている）：Dropbox でもフォルダの名前を変える
+export async function folderRenamed(f, oldName) {
+  if (f.synced) { const mv = (await db.getMeta('dbxFolderMoves')) || []; mv.push({ from: '/' + oldName, to: '/' + f.name }); await db.setMeta('dbxFolderMoves', mv); }
+  // 動かしたあとの原稿は、送るときに Dropbox の中身と見比べて合わせる（同じなら何もしない）
+  for (const d of S.docs.filter(x => x.folder === f.name)) { if (d.path) { d.path = null; d.rev = null; await db.put('docs', d); } }
+  f.synced = false; f.castRev = null; f.castDirty = true; await db.put('folders', f);
+  schedule();
+}
+// フォルダを消した（中の原稿も消した）：Dropbox でもフォルダごと消す
+export async function folderRemoved(f) {
+  if (f.synced) { const dels = (await db.getMeta('dbxDeletes')) || []; dels.push('/' + f.name); await db.setMeta('dbxDeletes', dels); }
+  schedule();
+}
 // 原稿を消した：Dropbox にあるものは、次の同期で Dropbox からも消す
 export async function removed(d) {
   if (d.path && d.rev) { const dels = (await db.getMeta('dbxDeletes')) || []; dels.push(d.path); await db.setMeta('dbxDeletes', dels); }
@@ -270,7 +302,7 @@ export async function signOut() {
   await dbx.signOut();
   for (const d of S.docs) { if (d.path || d.rev) { d.path = null; d.rev = null; await db.put('docs', d); } }
   for (const f of S.folders) { if (f.synced || f.castRev) { f.synced = false; f.castRev = null; await db.put('folders', f); } }
-  await db.setMeta('dbxCursor', null); await db.setMeta('dbxDeletes', []);
+  await db.setMeta('dbxCursor', null); await db.setMeta('dbxDeletes', []); await db.setMeta('dbxFolderMoves', []);
   status = 'local'; lastSync = 0; emit();
 }
 // 同期を始める前に、編集画面の書きかけを端末に保存させる
