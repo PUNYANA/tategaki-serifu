@@ -132,11 +132,6 @@ header h1{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 画面に出るキーボードが出ている間（body.kb）：本文を広く使う。
    次のセリフへ＝改行2回、完了＝キーボードの✓、話者＝枠の上の名前、で代わりになるので下のボタン列も隠す */
 body.kb.in-editor #bar{display:none}
-body.kb.in-editor #canvas{padding-block:4px}
-body.kb.in-editor .blk{padding-top:34px;padding-bottom:12px}
-body.kb.in-editor .div{padding-top:8px;padding-bottom:12px}
-body.kb.in-editor .grip,body.kb.in-editor .pick{display:none}
-body.kb.in-editor .who{top:3px}
 /* 最後尾のセリフが左端に貼りつかないよう、末尾に余白 */
 .tail{flex:none;width:min(40vw,320px);height:1px}
 #root{margin:0}
@@ -195,7 +190,6 @@ button,.slot,.newcol,.who{touch-action:manipulation}
 header{padding-top:calc(10px + env(safe-area-inset-top,0px))}
 #pos{padding-top:calc(max(4px,env(safe-area-inset-top,0px)) + 12px);padding-bottom:4px}
 #bar{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
-body.kb.in-editor #canvas{padding-bottom:8px}
 /* 上の線はタップ・なぞりで移動できる */
 #pos{touch-action:none;cursor:pointer;-webkit-user-select:none;user-select:none}
 /* iOS 26 のすりガラスのぼかし対策（試し）：上端・下端に無地の帯を置く。画面の端に固定の無地があると、iOS がぼかしの代わりにその色を使うことがある */
@@ -213,3 +207,10 @@ body.kb.in-editor.editing #kbdone{display:block}
 .fh button.more{border:0;background:transparent;width:40px;font-size:18px;color:var(--muted);padding:0}
 #hdr button.reload{font-size:16px;padding-inline:10px}
 .sheet select{font:inherit;font-size:16px;padding:8px 10px;border-radius:8px;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);flex:1;min-width:0}
+/* 1列＝15字で折り返す。枠の高さを画面の高さではなく字数で決めるので、キーボードの開閉で枠が縮んだり折り返しが変わったりしない。
+   21px の文字に字間 .06em で、1字＝22.26px。15字＝334px（少し余裕をみて 336px）。
+   枠の上（つまみ・名前）66px、下（選ぶ丸）44px、上の色の線 4px、下の線 1px を足すと、枠全体は 451px */
+:root{--col:336px}
+.blk{height:var(--col)}
+.div{height:calc(var(--col) + 115px - 100px)}
+.newcol{height:calc(var(--col) + 111px)}
