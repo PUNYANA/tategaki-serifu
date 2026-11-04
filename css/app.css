@@ -264,3 +264,7 @@ body.kb.in-editor.editing .kbmove{display:block}
 .sortl li{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--rule);padding-bottom:6px}
 .sortl .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--f-text);font-size:15px}
 .sortl button{min-height:40px;width:44px;padding:0}
+/* キャラ表：並べ替えの▲▼と、消す前の確かめ */
+.cast .mv{min-height:36px;width:36px;padding:0;flex:none}
+.cast-ask{border:1px solid var(--pin-edge);background:var(--pin);border-radius:10px;padding:10px 12px}
+.cast-ask p{margin:0 0 8px;color:var(--ink)}

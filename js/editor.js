@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=34';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=34';
-import * as db from './db.js?v=34';
-import * as sync from './sync.js?v=34';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=35';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=35';
+import * as db from './db.js?v=35';
+import * as sync from './sync.js?v=35';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -351,13 +351,14 @@ function openCast() {
     });
     if (snap() !== before) pushUndo(before); save(); closeLayer(); render();
   };
-  // 1行＝1キャラ（色の丸・名前・消す）。list はレギュラー（st.cast）かゲスト（st.guests）
+  // 1行＝1キャラ（色の丸・名前、ゲストだけ「消す」）。list はレギュラー（st.cast）かゲスト（st.guests）。
+  // レギュラーはここでは消さない（全部のノートに効くので、一覧のフォルダの「…」→「キャラ表」で確かめてから消す）
   const row = (c, list, box) => {
-    const r = document.createElement('div'); r.className = 'cast';
-    r.innerHTML = `<button type="button" class="swatch" aria-label="色を変える" style="--c:${c.color}"></button><input type="search" enterkeyhint="done" id="cn-${c.id}" name="chara-${c.id}" value="${esc(c.name)}" placeholder="名前" aria-label="キャラ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="danger">消す</button>`;
+    const r = document.createElement('div'); r.className = 'cast'; const canDel = list === st.guests;
+    r.innerHTML = `<button type="button" class="swatch" aria-label="色を変える" style="--c:${c.color}"></button><input type="search" enterkeyhint="done" id="cn-${c.id}" name="q-${c.id}" value="${esc(c.name)}" placeholder="キャラ" aria-label="キャラ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">${canDel ? '<button type="button" class="danger">消す</button>' : ''}`;
     r.children[0].onclick = () => { c.color = COLORS[(COLORS.indexOf(c.color) + 1) % COLORS.length]; save(); draw(); };
     r.children[1].oninput = e => { c.name = e.target.value.replace(/[：:]/g, ''); save(); };
-    r.children[2].onclick = () => { list.splice(list.indexOf(c), 1); save(); draw(); };
+    if (canDel) r.children[2].onclick = () => { list.splice(list.indexOf(c), 1); save(); draw(); };
     box.appendChild(r);
   };
   const draw = () => {
@@ -365,7 +366,7 @@ function openCast() {
       <h2>キャラ表</h2><p>色の丸を押すと色が変わります。消したキャラのセリフは話者なしに戻ります。</p>
       <section><h3>レギュラー（この作品の全部のノート）</h3>
         <div id="cl" class="cast-list"></div>
-        <p>レギュラーを足すときは、一覧のフォルダの「…」→「キャラ表」から。</p></section>
+        <p>レギュラーを足す・消す・並べ替えるときは、一覧のフォルダの「…」→「キャラ表」から。</p></section>
       <section><h3>この回のゲスト（このノートだけ）</h3>
         <div id="gl" class="cast-list"></div></section>
       <div class="row"><span class="sp"></span><button type="button" class="pri" id="cl-close">閉じる</button></div></div></div>`;
@@ -476,7 +477,7 @@ function openPop(id) {
   };
   // 「＋ ゲスト」：その場で名前を打って、この回のゲストとして足す。同じ名前の人がいれば、その人を選ぶ
   const ask = () => {
-    o.innerHTML = `<input type="search" enterkeyhint="done" id="pop-g" name="guest-name" placeholder="ゲストの名前" aria-label="ゲストの名前" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">`
+    o.innerHTML = `<input type="search" enterkeyhint="done" id="pop-g" name="guest-name" placeholder="ゲスト" aria-label="ゲスト" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">`
       + `<button type="button" class="pri" id="pop-ok">足す</button><button type="button" id="pop-back">戻る</button>`;
     const inp = $('pop-g');
     const ok = () => {

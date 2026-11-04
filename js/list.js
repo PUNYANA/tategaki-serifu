@@ -1,8 +1,8 @@
 // 原稿一覧：作品フォルダごとに原稿を並べる（更新順）
-import { $, esc, btn, toast, closeLayer, bgClose, themeButtons } from './ui.js?v=34';
-import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=34';
-import * as db from './db.js?v=34';
-import * as sync from './sync.js?v=34';
+import { $, esc, btn, toast, closeLayer, bgClose, themeButtons } from './ui.js?v=35';
+import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=35';
+import * as db from './db.js?v=35';
+import * as sync from './sync.js?v=35';
 
 let S = null, onOpen = null;
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -202,7 +202,7 @@ function folderMenu(f, confirming = false) {
   }
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="フォルダの操作">
     <h2>${esc(f.name)}</h2><p>ノート ${docs.length}冊　レギュラー ${f.cast.length}人</p>
-    <section><h3>名前を変える</h3><div class="row"><input type="search" enterkeyhint="done" id="fm-name" name="folder-title" value="${esc(f.name)}" aria-label="フォルダの名前" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1"><button type="button" id="fm-ren">変更</button></div><p class="err" id="fm-err"></p></section>
+    <section><h3>名前を変える</h3><div class="row"><input type="search" enterkeyhint="done" id="fm-name" name="folder-title" value="${esc(f.name)}" aria-label="フォルダ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1"><button type="button" id="fm-ren">変更</button></div><p class="err" id="fm-err"></p></section>
     <section><div class="row"><button type="button" id="fm-sort">並べ替え</button><button type="button" id="fm-cast">キャラ表（レギュラー）</button><button type="button" class="danger" id="fm-del">フォルダを削除</button><span class="sp"></span><button type="button" class="pri" id="fm-close">閉じる</button></div></section>
   </div></div>`;
   const rename = async () => {
@@ -231,18 +231,33 @@ function castSheet(f) {
     f.cast.forEach(c => { const old = oldNames.get(c.id); if (old && old !== c.name) c.aliases = [...new Set([...(c.aliases || []), old])].filter(a => a !== c.name); });
     f.castDirty = true; await db.put('folders', f); sync.schedule(); closeLayer(); renderList();
   };
+  let asking = null; // 「消す」を押して、確かめているキャラの id
   const draw = () => {
     $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="キャラ表">
-      <h2>キャラ表：${esc(f.name)}</h2><p>この作品の全部のノートで使うキャラ（レギュラー）です。色の丸を押すと色が変わります。その回だけのキャラ（ゲスト）は、ノートの中でセリフの上の名前から足します。</p>
+      <h2>キャラ表：${esc(f.name)}</h2><p>この作品の全部のノートで使うキャラ（レギュラー）です。色の丸を押すと色が変わります。▲▼で順番を変えます（セリフの上で話者を選ぶときの並び）。その回だけのキャラ（ゲスト）は、ノートの中でセリフの上の名前から足します。</p>
       <div id="fcl" class="cast-list"></div>
       <div class="row"><button type="button" id="fcl-add">＋ レギュラーを追加</button><span class="sp"></span><button type="button" class="pri" id="fcl-close">閉じる</button></div></div></div>`;
     const box = $('fcl');
-    f.cast.forEach(c => {
-      const r = document.createElement('div'); r.className = 'cast';
-      r.innerHTML = `<button type="button" class="swatch" aria-label="色を変える" style="--c:${c.color}"></button><input type="search" enterkeyhint="done" id="fcn-${c.id}" name="chara-${c.id}" value="${esc(c.name)}" placeholder="名前" aria-label="キャラ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="danger">消す</button>`;
-      r.children[0].onclick = () => { c.color = COLORS[(COLORS.indexOf(c.color) + 1) % COLORS.length]; draw(); };
-      r.children[1].oninput = e => { c.name = e.target.value.replace(/[：:]/g, ''); };
-      r.children[2].onclick = () => { f.cast.splice(f.cast.indexOf(c), 1); draw(); };
+    f.cast.forEach((c, i) => {
+      const r = document.createElement('div');
+      if (asking === c.id) {
+        // 消す前にもう一度確かめる（全部のノートで、このキャラのセリフが話者なしになる）
+        r.className = 'cast-ask';
+        r.innerHTML = `<p>「${esc(c.name || '（未入力）')}」を消しますか？この作品の全部のノートで、このキャラのセリフは話者なしになります。</p>
+          <div class="row"><span class="sp"></span><button type="button">やめる</button><button type="button" class="danger">消す</button></div>`;
+        const [no, yes] = r.querySelectorAll('button');
+        no.onclick = () => { asking = null; draw(); };
+        yes.onclick = () => { f.cast.splice(f.cast.indexOf(c), 1); asking = null; draw(); };
+        box.appendChild(r); return;
+      }
+      r.className = 'cast';
+      r.innerHTML = `<button type="button" class="swatch" aria-label="色を変える" style="--c:${c.color}"></button><input type="search" enterkeyhint="done" id="fcn-${c.id}" name="q-${c.id}" value="${esc(c.name)}" placeholder="キャラ" aria-label="キャラ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="mv" aria-label="上へ" ${i ? '' : 'disabled'}>▲</button><button type="button" class="mv" aria-label="下へ" ${i < f.cast.length - 1 ? '' : 'disabled'}>▼</button><button type="button" class="danger">消す</button>`;
+      const [sw, inp, up, dn, del] = r.children;
+      sw.onclick = () => { c.color = COLORS[(COLORS.indexOf(c.color) + 1) % COLORS.length]; draw(); };
+      inp.oninput = e => { c.name = e.target.value.replace(/[：:]/g, ''); };
+      const move = j => { [f.cast[i], f.cast[j]] = [f.cast[j], f.cast[i]]; draw(); };
+      up.onclick = () => move(i - 1); dn.onclick = () => move(i + 1);
+      del.onclick = () => { asking = c.id; draw(); };
       box.appendChild(r);
     });
     if (!f.cast.length) box.innerHTML = '<p>まだレギュラーがいません。</p>';
