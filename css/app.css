@@ -191,3 +191,8 @@ button,.slot,.newcol,.who{touch-action:manipulation}
 #pos .track{height:3px;background:color-mix(in srgb,var(--muted) 45%,transparent)}
 #canvas{scrollbar-width:none}
 #canvas::-webkit-scrollbar{display:none}
+/* iOS 26（リキッドグラス）：画面の上端・下端にはすりガラスのぼかしがかかるので、表示をその内側に寄せる */
+header{padding-top:calc(10px + env(safe-area-inset-top,0px))}
+#pos{padding-top:calc(max(4px,env(safe-area-inset-top,0px)) + 12px);padding-bottom:4px}
+#bar{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+body.kb.in-editor #canvas{padding-bottom:8px}
