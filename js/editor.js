@@ -1,8 +1,8 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=6';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, COLORS, splitParas } from './textfile.js?v=6';
-import * as db from './db.js?v=6';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=8';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=8';
+import * as db from './db.js?v=8';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -23,16 +23,16 @@ export const SAMPLE = [
 
 let uid = 1;
 const mk = o => ({ id: uid++, type: o.type, text: o.text || '', who: o.who || null });
-let st = { items: [], cast: [] };
+let st = { items: [], cast: [], guests: [] }; // cast＝レギュラー（作品フォルダのキャラ表）、guests＝この回のゲスト
 let cur = null;      // { doc, folder, meta } 開いている原稿
 let active = false;  // 編集画面を表示中か
 let saveT = 0;
 let sel = new Set();
 const undo = [], redo = [];
 const cv = $('canvas');
-const plain = () => ({ items: st.items.map(i => ({ type: i.type, text: i.text, who: i.who })), cast: st.cast });
+const plain = () => ({ items: st.items.map(i => ({ type: i.type, text: i.text, who: i.who })), cast: st.cast, guests: st.guests });
 const snap = () => JSON.stringify(plain());
-function restore(s) { const o = JSON.parse(s); st.items = o.items.map(mk); st.cast = o.cast; }
+function restore(s) { const o = JSON.parse(s); st.items = o.items.map(mk); st.cast = o.cast; st.guests = o.guests || []; }
 function pushUndo(s) { undo.push(s); if (undo.length > 200) undo.shift(); redo.length = 0; }
 function commit(fn) { pushUndo(snap()); fn(); save(); }
 
@@ -43,7 +43,7 @@ function save() {
   const ta = $('inl');
   const items = st.items.map(i => editing && ta && i.id === editing.id ? { ...i, text: ta.value } : i);
   cur.folder.cast = st.cast;
-  const text = serializeDoc({ title: cur.doc.name, meta: cur.meta, items }, st.cast);
+  const text = serializeDoc({ title: cur.doc.name, meta: cur.meta, guests: st.guests, items }, st.cast);
   if (text !== cur.doc.text) { cur.doc.text = text; cur.doc.updated = Date.now(); cur.doc.stats = docStats(items); }
   const doc = cur.doc, folder = cur.folder;
   db.saveDoc(doc, folder).then(() => { if (failed) { failed = false; db.unstash(doc.id); } }, e => {
@@ -65,7 +65,7 @@ export function setOnBack(fn) { onBack = fn; }
 export function openEditor(doc, folder) {
   const p = parseDoc(doc.text, folder.cast);
   cur = { doc, folder, meta: p.meta };
-  st = { items: p.items.map(mk), cast: folder.cast };
+  st = { items: p.items.map(mk), cast: folder.cast, guests: p.guests };
   sel = new Set(); undo.length = 0; redo.length = 0; editing = null; lock = null; g = null;
   active = true; closeLayer(); closePop();
   allowJumpFor(500); render(); cv.scrollLeft = 0; lastSl = 0;
@@ -81,7 +81,7 @@ export function closeEditor() {
 
 const fmt = s => esc(s).replace(/(^|[^0-9])([0-9]{2})(?![0-9])/g, '$1<span class="tcy">$2</span>').replace(/(!\?|\?!|!!|\?\?)/g, '<span class="tcy">$1</span>');
 const idx = id => st.items.findIndex(i => i.id === id);
-const who = id => st.cast.find(c => c.id === id) || null;
+const who = id => st.guests.find(c => c.id === id) || st.cast.find(c => c.id === id) || null;
 function chipBtn(c, on, fn) { const b = btn(c.name, fn, 'chip' + (on ? ' on' : '')); b.style.setProperty('--c', c.color); return b; }
 
 /* ---- 横スクロールの位置 ----
@@ -117,7 +117,8 @@ function render() {
     ta.focus({ preventScroll: true }); ta.setSelectionRange(ta.value.length, ta.value.length);
     ta.addEventListener('input', onType); ta.addEventListener('keydown', onKey);
     ta.addEventListener('compositionend', scheduleSave); ta.addEventListener('change', save);
-    ta.addEventListener('blur', () => setTimeout(() => { if (editing && document.activeElement !== $('inl') && !$('layer').innerHTML) finishEdit(); }, 150));
+    // 話者の一覧（ゲストの名前を打つ欄）を開いている間は、入力欄からフォーカスが外れても書くのを終えない
+    ta.addEventListener('blur', () => setTimeout(() => { if (editing && document.activeElement !== $('inl') && !$('layer').innerHTML && !$('pop')) finishEdit(); }, 150));
   }
   renderBar();
 }
@@ -159,7 +160,13 @@ function addDiv() {
   if (at >= 0) { commit(() => st.items.splice(at, 0, mk({ type: 'div' }))); sel.clear(); render(); toast('選んだセリフの前に区切りを入れました'); return; }
   commit(() => st.items.push(mk({ type: 'div' }))); render(); scrollToI(st.items.length - 1);
 }
-function scrollToI(i) { allowJumpFor(1500); requestAnimationFrame(() => { const el = cv.querySelector(`[data-i="${i}"]`); el && el.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' }); }); }
+function scrollToI(i) {
+  allowJumpFor(1500); const doc = cur && cur.doc;
+  requestAnimationFrame(() => {
+    if (!cur || cur.doc !== doc) return; // 実行されるまでに別の原稿へ切り替わっていたら何もしない
+    const el = cv.querySelector(`[data-i="${i}"]`); el && el.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+  });
+}
 function moveTo(ids, at) {
   commit(() => {
     const mv = st.items.filter(i => ids.has(i.id)); let k = 0; st.items.slice(0, at).forEach(i => { if (!ids.has(i.id)) k++; });
@@ -268,6 +275,7 @@ function openCast() {
   const oldNames = new Map(st.cast.map(c => [c.id, c.name]));
   const close = () => {
     st.cast = st.cast.filter(c => c.name.trim());
+    st.guests = st.guests.filter(c => c.name.trim());
     // 名前を変えたら古い名前を別名に残す（過去の原稿の話者名と照合するため）
     st.cast.forEach(c => {
       const old = oldNames.get(c.id);
@@ -275,22 +283,30 @@ function openCast() {
     });
     if (snap() !== before) pushUndo(before); save(); closeLayer(); render();
   };
+  // 1行＝1キャラ（色の丸・名前・消す）。list はレギュラー（st.cast）かゲスト（st.guests）
+  const row = (c, list, box) => {
+    const r = document.createElement('div'); r.className = 'cast';
+    r.innerHTML = `<button type="button" class="swatch" aria-label="色を変える" style="--c:${c.color}"></button><input type="text" id="cn-${c.id}" name="chara-${c.id}" value="${esc(c.name)}" placeholder="名前" aria-label="キャラ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="danger">消す</button>`;
+    r.children[0].onclick = () => { c.color = COLORS[(COLORS.indexOf(c.color) + 1) % COLORS.length]; save(); draw(); };
+    r.children[1].oninput = e => { c.name = e.target.value.replace(/[：:]/g, ''); save(); };
+    r.children[2].onclick = () => { list.splice(list.indexOf(c), 1); save(); draw(); };
+    box.appendChild(r);
+  };
   const draw = () => {
     $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="キャラ表">
-      <h2>キャラ表</h2><p>色の丸を押すと色が変わります。消したキャラのセリフは「誰？」に戻ります。</p>
-      <div id="cl" style="display:flex;flex-direction:column;gap:8px"></div>
-      <div class="row"><button type="button" id="cl-add">＋ キャラを追加</button><span class="sp"></span><button type="button" class="pri" id="cl-close">閉じる</button></div></div></div>`;
-    const cl = $('cl');
-    st.cast.forEach((c, k) => {
-      const r = document.createElement('div'); r.className = 'cast';
-      r.innerHTML = `<button type="button" class="swatch" aria-label="色を変える" style="--c:${c.color}"></button><input type="text" id="cn-${c.id}" name="chara-${c.id}" value="${esc(c.name)}" placeholder="名前" aria-label="キャラ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="danger">消す</button>`;
-      r.children[0].onclick = () => { c.color = COLORS[(COLORS.indexOf(c.color) + 1) % COLORS.length]; save(); draw(); };
-      r.children[1].oninput = e => { c.name = e.target.value; save(); };
-      r.children[2].onclick = () => { st.cast.splice(k, 1); save(); draw(); };
-      cl.appendChild(r);
-    });
-    if (!st.cast.length) cl.innerHTML = '<p>まだキャラがいません。</p>';
-    $('cl-add').onclick = () => { const id = 'c' + Date.now().toString(36); st.cast.push({ id, name: '', color: COLORS[st.cast.length % COLORS.length], aliases: [] }); draw(); const el = $('cn-' + id); el && el.focus(); };
+      <h2>キャラ表</h2><p>色の丸を押すと色が変わります。消したキャラのセリフは話者なしに戻ります。</p>
+      <section><h3>レギュラー（この作品の全部の原稿）</h3>
+        <div id="cl" class="cast-list"></div>
+        <div class="row"><button type="button" id="cl-add">＋ レギュラーを追加</button></div></section>
+      <section><h3>この回のゲスト（この原稿だけ）</h3>
+        <div id="gl" class="cast-list"></div></section>
+      <div class="row"><span class="sp"></span><button type="button" class="pri" id="cl-close">閉じる</button></div></div></div>`;
+    const cl = $('cl'), gl = $('gl');
+    st.cast.forEach(c => row(c, st.cast, cl));
+    st.guests.forEach(c => row(c, st.guests, gl));
+    if (!st.cast.length) cl.innerHTML = '<p>まだレギュラーがいません。</p>';
+    if (!st.guests.length) gl.innerHTML = '<p>ゲストはいません。セリフの枠の上の名前をタップして「＋ ゲスト」から足せます。</p>';
+    $('cl-add').onclick = () => { const id = 'c' + Date.now().toString(36); st.cast.push({ id, name: '', color: pickColor([...st.cast, ...st.guests].map(c => c.color)), aliases: [] }); draw(); const el = $('cn-' + id); el && el.focus(); };
     $('cl-close').onclick = close; bgClose(close);
   };
   draw();
@@ -302,7 +318,7 @@ function exportText(withName, items) {
   let pg = items.length && items[0].type !== 'div' ? 1 : 0; // 最初の区切りより前にセリフがあれば、最初の区切りは P2
   return items.map(i => { if (i.type === 'div') { pg++; return '--- P' + pg; } const w = who(i.who); return withName && w ? `${w.name}：${i.text}` : i.text; }).join('\n\n');
 }
-const importText = t => parseBody(t, st.cast).map(mk);
+const importText = t => parseBody(t, st.cast, st.guests).map(mk); // 知らない名前はこの回のゲストになる
 function punct(t, o) { if (o.maru) t = t.replace(/[。｡]/g, ''); if (o.ten) t = t.replace(/[、､]/g, o.half ? ' ' : '　'); return t.replace(/[ 　]+$/gm, ''); }
 function openMenu() {
   if (editing) finishEdit();
@@ -353,29 +369,62 @@ function openMenu() {
 }
 
 /* ---- その場の話者ポップアップ ---- */
-function closePop() { const o = $('pop'); o && o.remove(); }
+function closePop() {
+  const o = $('pop'); if (!o) return; o.remove();
+  // ゲストの名前を打ったまま閉じたときは、書いている入力欄にフォーカスが戻らない。戻っていなければ書くのを終える
+  setTimeout(() => { if (editing && document.activeElement !== $('inl') && !$('pop') && !$('layer').innerHTML) finishEdit(); }, 150);
+}
+// 一覧の並び：レギュラー → 仕切り → この回のゲスト → 「＋ ゲスト」 → 「なし」
 function openPop(id) {
   closePop();
   if (editing && editing.id !== id) finishEdit();
   let it = st.items[idx(id)]; if (!it) return;
-  if (!st.cast.length) { openCast(); return; }
   const anchor = cv.querySelector(`[data-i="${idx(id)}"] .who`); if (!anchor) return;
   const ids = sel.has(id) ? [...sel] : [id];
   const o = document.createElement('div'); o.id = 'pop'; o.setAttribute('role', 'menu');
-  const set = w => {
+  // w：話者のid（なしは null）。g：新しく足すゲスト（あれば一緒に足す。元に戻すと一緒に消える）
+  const set = (w, g) => {
     closePop();
-    if (editing && editing.id === id) { it.who = w; editing.dirty = true; const ta = $('inl'); const v = ta ? ta.value : ''; render(); const t2 = $('inl'); if (t2) { t2.value = v; fitTa(); } scheduleSave(); return; }
-    commit(() => ids.forEach(k => { const x = st.items[idx(k)]; if (x && x.type === 'line') x.who = w; })); render();
+    if (editing && editing.id === id) {
+      if (g) st.guests.push(g);
+      it.who = w; editing.dirty = true; const ta = $('inl'); const v = ta ? ta.value : ''; render(); const t2 = $('inl'); if (t2) { t2.value = v; fitTa(); } scheduleSave(); return;
+    }
+    commit(() => { if (g) st.guests.push(g); ids.forEach(k => { const x = st.items[idx(k)]; if (x && x.type === 'line') x.who = w; }); }); render();
   };
-  st.cast.forEach(c => o.appendChild(chipBtn(c, it.who === c.id, () => set(c.id))));
-  o.appendChild(btn('なし', () => set(null), 'chip none'));
-  o.querySelectorAll('button').forEach(b => b.addEventListener('pointerdown', e => e.preventDefault()));
+  const place = () => {
+    const r = anchor.getBoundingClientRect(), w = o.offsetWidth;
+    o.style.top = (r.bottom + 4) + 'px'; o.style.left = Math.max(16, Math.min(window.innerWidth - 16 - w, r.left + r.width / 2 - w / 2)) + 'px';
+  };
+  const keepFocus = () => o.querySelectorAll('button').forEach(b => b.addEventListener('pointerdown', e => e.preventDefault()));
+  const list = () => {
+    o.innerHTML = '';
+    st.cast.forEach(c => o.appendChild(chipBtn(c, it.who === c.id, () => set(c.id))));
+    if (st.cast.length && st.guests.length) { const s = document.createElement('span'); s.className = 'pop-sep'; s.setAttribute('aria-hidden', 'true'); o.appendChild(s); }
+    st.guests.forEach(c => { const b = chipBtn(c, it.who === c.id, () => set(c.id)); b.classList.add('guest'); o.appendChild(b); });
+    o.appendChild(btn('＋ ゲスト', ask, 'chip add'));
+    o.appendChild(btn('なし', () => set(null), 'chip none'));
+    keepFocus(); place();
+  };
+  // 「＋ ゲスト」：その場で名前を打って、この回のゲストとして足す。同じ名前の人がいれば、その人を選ぶ
+  const ask = () => {
+    o.innerHTML = `<input type="text" id="pop-g" name="guest-name" placeholder="ゲストの名前" aria-label="ゲストの名前" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">`
+      + `<button type="button" class="pri" id="pop-ok">足す</button><button type="button" id="pop-back">戻る</button>`;
+    const inp = $('pop-g');
+    const ok = () => {
+      const name = inp.value.trim().replace(/[：:]/g, ''); if (!name) { inp.focus(); return; }
+      const c = findSpeaker(name, st.cast, st.guests);
+      if (c) set(c.id); else { const g = newGuest(name, st.cast, st.guests); set(g.id, g); }
+    };
+    $('pop-ok').onclick = ok; $('pop-back').onclick = list;
+    inp.onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ok(); } };
+    $('pop-ok').addEventListener('pointerdown', e => e.preventDefault()); $('pop-back').addEventListener('pointerdown', e => e.preventDefault());
+    place(); inp.focus();
+  };
   document.body.appendChild(o);
-  const r = anchor.getBoundingClientRect(), w = o.offsetWidth;
-  o.style.top = (r.bottom + 4) + 'px'; o.style.left = Math.max(16, Math.min(window.innerWidth - 16 - w, r.left + r.width / 2 - w / 2)) + 'px';
+  list();
 }
 document.addEventListener('pointerdown', e => { if ($('pop') && !e.target.closest('#pop,.who')) closePop(); }, true);
-cv.addEventListener('scroll', closePop);
+cv.addEventListener('scroll', () => { if (!$('pop-g')) closePop(); }); // ゲストの名前を打っている間は閉じない
 
 /* ---- 上の細い位置表示 ----
    線全体＝原稿全体（右が書き出し）。濃い部分＝いま画面に見えている範囲。目盛り＝ページの区切り。右に今のページ番号 */

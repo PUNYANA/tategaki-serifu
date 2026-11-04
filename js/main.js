@@ -1,8 +1,8 @@
 // 起動と、一覧⇔編集の切り替え
-import { $, toast } from './ui.js?v=6';
-import * as db from './db.js?v=6';
-import { openEditor, closeEditor, setOnBack, SAMPLE, SAMPLE_CAST } from './editor.js?v=6';
-import { initList, renderList, newDoc } from './list.js?v=6';
+import { $, toast } from './ui.js?v=8';
+import * as db from './db.js?v=8';
+import { openEditor, closeEditor, setOnBack, SAMPLE, SAMPLE_CAST } from './editor.js?v=8';
+import { initList, renderList, newDoc } from './list.js?v=8';
 
 const state = { folders: [], docs: [] };
 
@@ -51,10 +51,10 @@ async function boot() {
   // 前回 IndexedDB に入らずに退避した分を戻す
   try { if (await db.restoreStash()) toast('前回保存しきれなかった分を戻しました'); } catch (e) { console.error(e); }
   let [folders, docs, last] = await Promise.all([db.all('folders'), db.all('docs'), db.getMeta('last')]);
-  if (!folders.length && !docs.length) { // 初回：ネタ帳フォルダにサンプルを1本
+  if (!folders.length && !docs.length) { // 初回：「サンプル」フォルダにサンプルの原稿を1本
     const cast = SAMPLE_CAST.map(c => ({ ...c, aliases: [] }));
-    const f = { name: 'ネタ帳', cast, created: Date.now() };
-    const d = newDoc('ネタ帳', 'サンプル', SAMPLE, cast);
+    const f = { name: 'サンプル', cast, created: Date.now() };
+    const d = newDoc('サンプル', 'サンプル', SAMPLE, cast);
     await db.put('folders', f); await db.put('docs', d);
     folders = [f]; docs = [d];
   }
