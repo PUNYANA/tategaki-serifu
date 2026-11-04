@@ -1,8 +1,8 @@
 // 原稿一覧：作品フォルダごとに原稿を並べる（更新順）
-import { $, esc, btn, toast, closeLayer, bgClose, themeButtons } from './ui.js?v=35';
-import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=35';
-import * as db from './db.js?v=35';
-import * as sync from './sync.js?v=35';
+import { $, esc, btn, toast, closeLayer, bgClose, themeButtons } from './ui.js?v=36';
+import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=36';
+import * as db from './db.js?v=36';
+import * as sync from './sync.js?v=36';
 
 let S = null, onOpen = null;
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -18,14 +18,14 @@ function fmtDate(t) {
 
 // Dropboxのファイル名に使えない文字・一覧に出なくなる名前を弾く。大文字小文字は同じ名前として扱う
 function badName(v) {
-  if (!v) return '名前を入れてください';
+  if (!v) return 'タイトルを入れてください';
   if (/[\\/:*?"<>|]/.test(v)) return '次の文字は使えません：\\ / : * ? " < > |';
-  if (/^[_.]/.test(v)) return '「_」か「.」で始まる名前は使えません';
-  if (v.length > 80) return '名前が長すぎます';
+  if (/^[_.]/.test(v)) return '「_」か「.」で始まるタイトルは使えません';
+  if (v.length > 80) return 'タイトルが長すぎます';
   return '';
 }
 const same = (a, b) => a.toLowerCase() === b.toLowerCase();
-const docCheck = (folder, self) => v => badName(v) || (S.docs.some(d => d.folder === folder && d !== self && same(d.name, v)) ? '同じフォルダに同じ名前のノートがあります' : '');
+const docCheck = (folder, self) => v => badName(v) || (S.docs.some(d => d.folder === folder && d !== self && same(d.name, v)) ? '同じフォルダに同じタイトルのノートがあります' : '');
 function uniqueName(folder, base) {
   const taken = v => S.docs.some(d => d.folder === folder && same(d.name, v));
   if (!taken(base)) return base;
@@ -79,13 +79,13 @@ export function renderList() {
 /* ---- 名前を打つシート ---- */
 function nameSheet({ title, value, ok, check, done }) {
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="${esc(title)}"><h2>${esc(title)}</h2>
-    <input type="search" enterkeyhint="done" id="nm" name="sheet-text" value="${esc(value)}" aria-label="${esc(title)}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><p class="err" id="nm-err"></p>
-    <div class="row"><span class="sp"></span><button type="button" id="nm-cancel">やめる</button><button type="button" class="pri" id="nm-ok">${esc(ok)}</button></div></div></div>`;
-  const inp = $('nm');
-  const go = () => { const v = inp.value.trim(); const e = check(v); if (e) { $('nm-err').textContent = e; return; } closeLayer(); done(v); };
-  $('nm-ok').onclick = go;
+    <input type="search" enterkeyhint="done" id="tx" name="sheet-text" value="${esc(value)}" aria-label="${esc(title)}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><p class="err" id="tx-err"></p>
+    <div class="row"><span class="sp"></span><button type="button" id="tx-cancel">やめる</button><button type="button" class="pri" id="tx-ok">${esc(ok)}</button></div></div></div>`;
+  const inp = $('tx');
+  const go = () => { const v = inp.value.trim(); const e = check(v); if (e) { $('tx-err').textContent = e; return; } closeLayer(); done(v); };
+  $('tx-ok').onclick = go;
   inp.onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); go(); } };
-  $('nm-cancel').onclick = closeLayer; bgClose(closeLayer);
+  $('tx-cancel').onclick = closeLayer; bgClose(closeLayer);
   inp.focus(); inp.select();
 }
 
@@ -98,7 +98,7 @@ function newDocSheet(folder) {
 function newFolder() {
   nameSheet({
     title: 'フォルダを作る', value: '', ok: '作る',
-    check: v => badName(v) || (S.folders.some(f => same(f.name, v)) ? '同じ名前のフォルダがあります' : ''),
+    check: v => badName(v) || (S.folders.some(f => same(f.name, v)) ? '同じタイトルのフォルダがあります' : ''),
     done: async v => { const f = { name: v, cast: [], created: Date.now() }; S.folders.push(f); await db.put('folders', f); sync.schedule(); renderList(); toast('フォルダを作りました'); },
   });
 }
@@ -122,23 +122,23 @@ function docMenu(d, confirming = false) {
   const clash = pair.length ? `<section class="clash"><h3>⚠ 衝突しています</h3>
       <p>${sync.isCopy(d) ? `「${esc(pair[0].name)}」（Dropbox の版）と` : `${pair.map(x => `「${esc(x.name)}」`).join('、')}と`}食い違っています。見比べて、残すほうを選んでください。</p>
       <div class="row"><button type="button" class="pri" id="dm-keep">この版を残す</button></div>
-      <p>${sync.isCopy(d) ? 'この版の中身を、元の名前のノートに移します。' : '別の版を消します。'}</p></section>` : '';
+      <p>${sync.isCopy(d) ? 'この版の中身を、元のノートに移します。' : '別の版を消します。'}</p></section>` : '';
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="ノートの操作">
     <h2>${esc(d.name)}</h2><p>${esc(d.folder)}　${fmtDate(d.updated)}　セリフ ${d.stats.lines}　${d.stats.chars}字</p>${clash}
-    <section><h3>名前を変える</h3><div class="row"><input type="search" enterkeyhint="done" id="dm-name" name="doc-title" value="${esc(d.name)}" aria-label="ノートのタイトル" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1"><button type="button" id="dm-ren">変更</button></div><p class="err" id="dm-err"></p></section>
+    <section><h3>タイトルを変える</h3><div class="row"><input type="search" enterkeyhint="done" id="dm-ttl" name="q-doc" value="${esc(d.name)}" aria-label="ノートのタイトル" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1"><button type="button" id="dm-ren">変更</button></div><p class="err" id="dm-err"></p></section>
     ${S.folders.length > 1 ? `<section><h3>別のフォルダへ移す</h3><div class="row"><select id="dm-to" aria-label="移す先のフォルダ">${S.folders.filter(f => f.name !== d.folder).sort((a, b) => a.name.localeCompare(b.name, 'ja')).map(f => `<option value="${esc(f.name)}">${esc(f.name)}</option>`).join('')}</select><button type="button" id="dm-move">移す</button></div></section>` : ''}
     <section><div class="row"><button type="button" id="dm-dup">複製</button><button type="button" class="danger" id="dm-del">削除</button><span class="sp"></span><button type="button" class="pri" id="dm-close">閉じる</button></div></section>
   </div></div>`;
   const rename = async () => {
-    const v = $('dm-name').value.trim(); if (v === d.name) { closeLayer(); return; }
+    const v = $('dm-ttl').value.trim(); if (v === d.name) { closeLayer(); return; }
     const e = docCheck(d.folder, d)(v); if (e) { $('dm-err').textContent = e; return; }
     const fo = S.folders.find(x => x.name === d.folder); if (fo && fo.order) { const k = fo.order.indexOf(d.name); if (k >= 0) { fo.order[k] = v; fo.castDirty = true; await db.put('folders', fo); } }
     d.name = v; d.text = setTitle(d.text, v); d.updated = Date.now(); d.dirty = true; d.sample = false; await db.put('docs', d); sync.schedule();
-    closeLayer(); renderList(); toast('名前を変えました');
+    closeLayer(); renderList(); toast('タイトルを変えました');
   };
   if (pair.length) $('dm-keep').onclick = async () => { const k = await sync.resolve(d); closeLayer(); renderList(); toast(`「${k.name}」の1本にしました`); };
   $('dm-ren').onclick = rename;
-  $('dm-name').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); rename(); } };
+  $('dm-ttl').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); rename(); } };
   // 別のフォルダへ移す（移す先に同じ名前があれば「名前 2」のようにする）。Dropbox でも移す
   if ($('dm-move')) $('dm-move').onclick = async () => {
     const to = $('dm-to').value; if (!to) return;
@@ -163,7 +163,7 @@ function dbxSheet() {
   if (!sync.configured()) {
     body = `<p>Dropbox の App key がまだ設定されていません（js/config.js）。</p>`;
   } else if (!sync.signedIn()) {
-    body = `<p>つなぐと、ノートを Dropbox の「アプリ」フォルダの中にある、このアプリ専用のフォルダ（Dropbox に登録したアプリの名前のフォルダ）に普通のテキストファイルとして保存し、ほかの端末と同期します。このアプリが触れるのは、そのフォルダの中だけです。つながなくても、この端末の中だけで使えます。</p>
+    body = `<p>つなぐと、ノートを Dropbox の「アプリ」フォルダの中にある、このアプリ専用のフォルダ（Dropbox に登録したアプリと同じ呼び方のフォルダ）に普通のテキストファイルとして保存し、ほかの端末と同期します。このアプリが触れるのは、そのフォルダの中だけです。つながなくても、この端末の中だけで使えます。</p>
       <div class="row"><button type="button" class="pri" id="dx-in">Dropbox につなぐ</button></div>`;
   } else {
     const label = { idle: '同期済み', busy: '送信中', offline: 'オフライン・端末に保存済み', error: '送信できません', local: '' }[sync.status] || '';
@@ -202,20 +202,20 @@ function folderMenu(f, confirming = false) {
   }
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="フォルダの操作">
     <h2>${esc(f.name)}</h2><p>ノート ${docs.length}冊　レギュラー ${f.cast.length}人</p>
-    <section><h3>名前を変える</h3><div class="row"><input type="search" enterkeyhint="done" id="fm-name" name="folder-title" value="${esc(f.name)}" aria-label="フォルダ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1"><button type="button" id="fm-ren">変更</button></div><p class="err" id="fm-err"></p></section>
+    <section><h3>タイトルを変える</h3><div class="row"><input type="search" enterkeyhint="done" id="fm-ttl" name="q-folder" value="${esc(f.name)}" aria-label="フォルダ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1"><button type="button" id="fm-ren">変更</button></div><p class="err" id="fm-err"></p></section>
     <section><div class="row"><button type="button" id="fm-sort">並べ替え</button><button type="button" id="fm-cast">キャラ表（レギュラー）</button><button type="button" class="danger" id="fm-del">フォルダを削除</button><span class="sp"></span><button type="button" class="pri" id="fm-close">閉じる</button></div></section>
   </div></div>`;
   const rename = async () => {
-    const v = $('fm-name').value.trim(); if (v === f.name) { closeLayer(); return; }
-    const e = badName(v) || (S.folders.some(x => x !== f && same(x.name, v)) ? '同じ名前のフォルダがあります' : '');
+    const v = $('fm-ttl').value.trim(); if (v === f.name) { closeLayer(); return; }
+    const e = badName(v) || (S.folders.some(x => x !== f && same(x.name, v)) ? '同じタイトルのフォルダがあります' : '');
     if (e) { $('fm-err').textContent = e; return; }
     const old = f.name; await db.del('folders', old); f.name = v;
     for (const d of docs) { d.folder = v; await db.put('docs', d); }
     await sync.folderRenamed(f, old); // フォルダも保存し直す
-    closeLayer(); renderList(); toast('フォルダの名前を変えました');
+    closeLayer(); renderList(); toast('フォルダのタイトルを変えました');
   };
   $('fm-ren').onclick = rename;
-  $('fm-name').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); rename(); } };
+  $('fm-ttl').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); rename(); } };
   $('fm-cast').onclick = () => castSheet(f);
   $('fm-sort').onclick = () => sortSheet(f);
   $('fm-del').onclick = () => folderMenu(f, true);
@@ -231,10 +231,10 @@ function castSheet(f) {
     f.cast.forEach(c => { const old = oldNames.get(c.id); if (old && old !== c.name) c.aliases = [...new Set([...(c.aliases || []), old])].filter(a => a !== c.name); });
     f.castDirty = true; await db.put('folders', f); sync.schedule(); closeLayer(); renderList();
   };
-  let asking = null; // 「消す」を押して、確かめているキャラの id
+  let asking = null, step = 0; // 「消す」を押して確かめているキャラの id と、何回目の確かめか（1→2 と確かめてから消す）
   const draw = () => {
     $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="キャラ表">
-      <h2>キャラ表：${esc(f.name)}</h2><p>この作品の全部のノートで使うキャラ（レギュラー）です。色の丸を押すと色が変わります。▲▼で順番を変えます（セリフの上で話者を選ぶときの並び）。その回だけのキャラ（ゲスト）は、ノートの中でセリフの上の名前から足します。</p>
+      <h2>キャラ表：${esc(f.name)}</h2><p>この作品の全部のノートで使うキャラ（レギュラー）です。色の丸を押すと色が変わります。▲▼で順番を変えます（セリフの上で話者を選ぶときの並び）。その回だけのキャラ（ゲスト）は、ノートの中でセリフの上の話者の欄から足します。</p>
       <div id="fcl" class="cast-list"></div>
       <div class="row"><button type="button" id="fcl-add">＋ レギュラーを追加</button><span class="sp"></span><button type="button" class="pri" id="fcl-close">閉じる</button></div></div></div>`;
     const box = $('fcl');
@@ -243,11 +243,18 @@ function castSheet(f) {
       if (asking === c.id) {
         // 消す前にもう一度確かめる（全部のノートで、このキャラのセリフが話者なしになる）
         r.className = 'cast-ask';
-        r.innerHTML = `<p>「${esc(c.name || '（未入力）')}」を消しますか？この作品の全部のノートで、このキャラのセリフは話者なしになります。</p>
-          <div class="row"><span class="sp"></span><button type="button">やめる</button><button type="button" class="danger">消す</button></div>`;
+        const nm = esc(c.name || '（未入力）');
+        r.innerHTML = step === 1
+          ? `<p>「${nm}」を消しますか？この作品の全部のノートで、このキャラのセリフは話者なしになります。</p>
+          <div class="row"><span class="sp"></span><button type="button">やめる</button><button type="button" class="danger">消す</button></div>`
+          : `<p><b>最後の確認です。</b>「${nm}」を本当に消しますか？</p>
+          <div class="row"><span class="sp"></span><button type="button">やめる</button><button type="button" class="danger">本当に消す</button></div>`;
         const [no, yes] = r.querySelectorAll('button');
-        no.onclick = () => { asking = null; draw(); };
-        yes.onclick = () => { f.cast.splice(f.cast.indexOf(c), 1); asking = null; draw(); };
+        no.onclick = () => { asking = null; step = 0; draw(); };
+        yes.onclick = () => {
+          if (step === 1) { step = 2; draw(); return; }
+          f.cast.splice(f.cast.indexOf(c), 1); asking = null; step = 0; draw();
+        };
         box.appendChild(r); return;
       }
       r.className = 'cast';
@@ -257,7 +264,7 @@ function castSheet(f) {
       inp.oninput = e => { c.name = e.target.value.replace(/[：:]/g, ''); };
       const move = j => { [f.cast[i], f.cast[j]] = [f.cast[j], f.cast[i]]; draw(); };
       up.onclick = () => move(i - 1); dn.onclick = () => move(i + 1);
-      del.onclick = () => { asking = c.id; draw(); };
+      del.onclick = () => { asking = c.id; step = 1; draw(); };
       box.appendChild(r);
     });
     if (!f.cast.length) box.innerHTML = '<p>まだレギュラーがいません。</p>';

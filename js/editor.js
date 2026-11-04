@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=35';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=35';
-import * as db from './db.js?v=35';
-import * as sync from './sync.js?v=35';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=36';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=36';
+import * as db from './db.js?v=36';
+import * as sync from './sync.js?v=36';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -374,7 +374,7 @@ function openCast() {
     st.cast.forEach(c => row(c, st.cast, cl));
     st.guests.forEach(c => row(c, st.guests, gl));
     if (!st.cast.length) cl.innerHTML = '<p>まだレギュラーがいません。</p>';
-    if (!st.guests.length) gl.innerHTML = '<p>ゲストはいません。セリフの枠の上の名前をタップして「＋ ゲスト」から足せます。</p>';
+    if (!st.guests.length) gl.innerHTML = '<p>ゲストはいません。セリフの枠の上の話者の欄をタップして「＋ ゲスト」から足せます。</p>';
     $('cl-close').onclick = close; bgClose(close);
   };
   draw();
@@ -395,7 +395,7 @@ function openMenu() {
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="出力・変換">
     <div class="row"><h2>出力・変換</h2><span class="sp"></span><span class="scope">${scopeSel ? `選択中の${sel.size}件が対象` : '全体が対象'}</span></div>
     <section><h3>書き出し</h3>
-      <div class="seg" role="group" aria-label="書き出し形式"><button type="button" id="o-name">名前：セリフ</button><button type="button" id="o-raw">入力したまま</button></div>
+      <div class="seg" role="group" aria-label="書き出し形式"><button type="button" id="o-name">話者：セリフ</button><button type="button" id="o-raw">入力したまま</button></div>
       <textarea id="o-ta" readonly aria-label="書き出し結果"></textarea>
       <div class="row"><button type="button" class="pri" id="o-copy">コピー</button></div></section>
     <section><h3>句読点の一括変換</h3>
@@ -404,7 +404,7 @@ function openMenu() {
       <label class="ck"><input type="checkbox" id="p-half">スペースを半角にする（ふだんは全角）</label>
       <div class="row"><button type="button" id="p-go">変換する</button></div><p>行末に残ったスペースは消します。元に戻せます。</p></section>
     <section><h3>読み込み</h3>
-      <textarea id="i-ta" name="import-text" autocomplete="off" placeholder="ここに貼り付け。セリフは空行で区切る。「名前：」で始まると話者がつく。「---」はページの区切り。" aria-label="読み込むテキスト"></textarea>
+      <textarea id="i-ta" name="import-text" autocomplete="off" placeholder="ここに貼り付け。セリフは空行で区切る。「先輩：」のように書き出すと話者がつく。「---」はページの区切り。" aria-label="読み込むテキスト"></textarea>
       <div class="row"><button type="button" id="i-add">最後に足す</button><button type="button" id="i-rep" class="danger">全部置き換え</button></div></section>
     <section><h3>設定</h3>
       <div class="row"><span class="lbl-t">色</span><span id="mn-theme"></span></div>
@@ -477,7 +477,7 @@ function openPop(id) {
   };
   // 「＋ ゲスト」：その場で名前を打って、この回のゲストとして足す。同じ名前の人がいれば、その人を選ぶ
   const ask = () => {
-    o.innerHTML = `<input type="search" enterkeyhint="done" id="pop-g" name="guest-name" placeholder="ゲスト" aria-label="ゲスト" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">`
+    o.innerHTML = `<input type="search" enterkeyhint="done" id="pop-g" name="q-guest" placeholder="ゲスト" aria-label="ゲスト" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">`
       + `<button type="button" class="pri" id="pop-ok">足す</button><button type="button" id="pop-back">戻る</button>`;
     const inp = $('pop-g');
     const ok = () => {
