@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=27';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=27';
-import * as db from './db.js?v=27';
-import * as sync from './sync.js?v=27';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=28';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=28';
+import * as db from './db.js?v=28';
+import * as sync from './sync.js?v=28';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -351,10 +351,10 @@ function openCast() {
   const draw = () => {
     $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="キャラ表">
       <h2>キャラ表</h2><p>色の丸を押すと色が変わります。消したキャラのセリフは話者なしに戻ります。</p>
-      <section><h3>レギュラー（この作品の全部の原稿）</h3>
+      <section><h3>レギュラー（この作品の全部のノート）</h3>
         <div id="cl" class="cast-list"></div>
         <p>レギュラーを足すときは、一覧のフォルダの「…」→「キャラ表」から。</p></section>
-      <section><h3>この回のゲスト（この原稿だけ）</h3>
+      <section><h3>この回のゲスト（このノートだけ）</h3>
         <div id="gl" class="cast-list"></div></section>
       <div class="row"><span class="sp"></span><button type="button" class="pri" id="cl-close">閉じる</button></div></div></div>`;
     const cl = $('cl'), gl = $('gl');

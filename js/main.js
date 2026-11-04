@@ -1,12 +1,12 @@
 // 起動と、一覧⇔編集の切り替え
-import { $, toast, applyTheme, getTheme } from './ui.js?v=27';
+import { $, toast, applyTheme, getTheme } from './ui.js?v=28';
 applyTheme(getTheme());
-import * as db from './db.js?v=27';
-import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=27';
-import { initList, renderList, newDoc } from './list.js?v=27';
-import * as sync from './sync.js?v=27';
-import { finishSignIn } from './dropbox.js?v=27';
-import { setTitle } from './textfile.js?v=27';
+import * as db from './db.js?v=28';
+import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=28';
+import { initList, renderList, newDoc } from './list.js?v=28';
+import * as sync from './sync.js?v=28';
+import { finishSignIn } from './dropbox.js?v=28';
+import { setTitle } from './textfile.js?v=28';
 
 const state = { folders: [], docs: [] };
 
@@ -34,7 +34,7 @@ const listShown = () => !$('listview').hidden;
 sync.onChange(ev => {
   if (listShown()) { if (!$('layer').innerHTML) renderList(); return; }
   const cd = currentDoc();
-  if (ev.removed && ev.removed === cd) { showList(); toast('この原稿は別の端末で消されました'); return; }
+  if (ev.removed && ev.removed === cd) { showList(); toast('このノートは別の端末で消されました'); return; }
   if ((ev.replaced && ev.replaced === cd) || (ev.cast && ev.cast === currentFolder())) reloadEditor();
   if (ev.conflict && ev.replaced === cd) toast(`別の端末の版と食い違ったので、この端末の版を「${ev.conflict.name}」に残しました`);
 });

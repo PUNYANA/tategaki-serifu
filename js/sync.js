@@ -6,9 +6,9 @@
 //  ・ログインしていなければ何もしない（端末の中だけで使える）
 // 原稿の同期用の項目： doc.path（Dropbox 上のパス）, doc.rev, doc.dirty（未送信の変更あり）
 // 作品フォルダの項目： folder.synced（Dropbox にフォルダを作った）, folder.castRev, folder.castDirty
-import * as dbx from './dropbox.js?v=27';
-import * as db from './db.js?v=27';
-import { parseDoc, docStats, setTitle } from './textfile.js?v=27';
+import * as dbx from './dropbox.js?v=28';
+import * as db from './db.js?v=28';
+import { parseDoc, docStats, setTitle } from './textfile.js?v=28';
 
 let S = null;
 const listeners = [];
@@ -123,11 +123,12 @@ async function pushAll() {
 }
 const onlySample = f => { const ds = S.docs.filter(d => d.folder === f.name); return ds.length > 0 && ds.every(d => d.sample); };
 
-const castJson = f => JSON.stringify({ version: 1, regulars: f.cast.map(c => ({ id: c.id, name: c.name, color: c.color, aliases: c.aliases || [] })) }, null, 2) + '\n';
+const castJson = f => JSON.stringify({ version: 1, regulars: f.cast.map(c => ({ id: c.id, name: c.name, color: c.color, aliases: c.aliases || [] })), order: f.order || [] }, null, 2) + '\n';
+const readOrder = text => { try { const j = JSON.parse(text); return Array.isArray(j.order) ? j.order : null; } catch (e) { return null; } };
 function readCast(text) { try { const j = JSON.parse(text); return Array.isArray(j.regulars) ? j.regulars : []; } catch (e) { return []; } }
 async function pushCast(f) {
   const path = `/${f.name}/_cast.json`;
-  if (!f.cast.length && !f.castRev) { f.castDirty = false; return; } // キャラがいないうちは作らない
+  if (!f.cast.length && !(f.order && f.order.length) && !f.castRev) { f.castDirty = false; return; } // キャラも並び順もないうちは作らない
   try {
     const m = await dbx.upload(path, castJson(f), f.castRev ? { update: f.castRev } : 'add'); f.castRev = m.rev;
   } catch (e) {
@@ -215,6 +216,7 @@ async function applyEntry(e) {
     const { text } = await dbx.download(e.path_lower);
     const regs = readCast(text);
     f.cast.splice(0, f.cast.length, ...regs.map(r => ({ id: r.id, name: r.name, color: r.color, aliases: r.aliases || [] })));
+    const ord = readOrder(text); if (ord) f.order = ord;
     f.castRev = e.rev; await db.put('folders', f); emit({ cast: f });
     return;
   }
