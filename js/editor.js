@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=17';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=17';
-import * as db from './db.js?v=17';
-import * as sync from './sync.js?v=17';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=18';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=18';
+import * as db from './db.js?v=18';
+import * as sync from './sync.js?v=18';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -305,7 +305,7 @@ function openCast() {
   // 1行＝1キャラ（色の丸・名前・消す）。list はレギュラー（st.cast）かゲスト（st.guests）
   const row = (c, list, box) => {
     const r = document.createElement('div'); r.className = 'cast';
-    r.innerHTML = `<button type="button" class="swatch" aria-label="色を変える" style="--c:${c.color}"></button><input type="text" id="cn-${c.id}" name="chara-${c.id}" value="${esc(c.name)}" placeholder="名前" aria-label="キャラ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="danger">消す</button>`;
+    r.innerHTML = `<button type="button" class="swatch" aria-label="色を変える" style="--c:${c.color}"></button><input type="search" enterkeyhint="done" id="cn-${c.id}" name="chara-${c.id}" value="${esc(c.name)}" placeholder="名前" aria-label="キャラ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="danger">消す</button>`;
     r.children[0].onclick = () => { c.color = COLORS[(COLORS.indexOf(c.color) + 1) % COLORS.length]; save(); draw(); };
     r.children[1].oninput = e => { c.name = e.target.value.replace(/[：:]/g, ''); save(); };
     r.children[2].onclick = () => { list.splice(list.indexOf(c), 1); save(); draw(); };
@@ -426,7 +426,7 @@ function openPop(id) {
   };
   // 「＋ ゲスト」：その場で名前を打って、この回のゲストとして足す。同じ名前の人がいれば、その人を選ぶ
   const ask = () => {
-    o.innerHTML = `<input type="text" id="pop-g" name="guest-name" placeholder="ゲストの名前" aria-label="ゲストの名前" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">`
+    o.innerHTML = `<input type="search" enterkeyhint="done" id="pop-g" name="guest-name" placeholder="ゲストの名前" aria-label="ゲストの名前" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">`
       + `<button type="button" class="pri" id="pop-ok">足す</button><button type="button" id="pop-back">戻る</button>`;
     const inp = $('pop-g');
     const ok = () => {

@@ -1,8 +1,8 @@
 // 原稿一覧：作品フォルダごとに原稿を並べる（更新順）
-import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=17';
-import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=17';
-import * as db from './db.js?v=17';
-import * as sync from './sync.js?v=17';
+import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=18';
+import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=18';
+import * as db from './db.js?v=18';
+import * as sync from './sync.js?v=18';
 
 let S = null, onOpen = null;
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -71,7 +71,7 @@ export function renderList() {
 /* ---- 名前を打つシート ---- */
 function nameSheet({ title, value, ok, check, done }) {
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="${esc(title)}"><h2>${esc(title)}</h2>
-    <input type="text" id="nm" name="sheet-text" value="${esc(value)}" aria-label="${esc(title)}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><p class="err" id="nm-err"></p>
+    <input type="search" enterkeyhint="done" id="nm" name="sheet-text" value="${esc(value)}" aria-label="${esc(title)}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><p class="err" id="nm-err"></p>
     <div class="row"><span class="sp"></span><button type="button" id="nm-cancel">やめる</button><button type="button" class="pri" id="nm-ok">${esc(ok)}</button></div></div></div>`;
   const inp = $('nm');
   const go = () => { const v = inp.value.trim(); const e = check(v); if (e) { $('nm-err').textContent = e; return; } closeLayer(); done(v); };
@@ -117,7 +117,7 @@ function docMenu(d, confirming = false) {
       <p>${sync.isCopy(d) ? 'この版の中身を、元の名前の原稿に移します。' : '別の版を消します。'}</p></section>` : '';
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="原稿の操作">
     <h2>${esc(d.name)}</h2><p>${esc(d.folder)}　${fmtDate(d.updated)}　セリフ ${d.stats.lines}　${d.stats.chars}字</p>${clash}
-    <section><h3>名前を変える</h3><div class="row"><input type="text" id="dm-name" name="doc-title" value="${esc(d.name)}" aria-label="原稿のタイトル" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1" enterkeyhint="done"><button type="button" id="dm-ren">変更</button></div><p class="err" id="dm-err"></p></section>
+    <section><h3>名前を変える</h3><div class="row"><input type="search" enterkeyhint="done" id="dm-name" name="doc-title" value="${esc(d.name)}" aria-label="原稿のタイトル" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1"><button type="button" id="dm-ren">変更</button></div><p class="err" id="dm-err"></p></section>
     ${S.folders.length > 1 ? `<section><h3>別のフォルダへ移す</h3><div class="row"><select id="dm-to" aria-label="移す先のフォルダ">${S.folders.filter(f => f.name !== d.folder).sort((a, b) => a.name.localeCompare(b.name, 'ja')).map(f => `<option value="${esc(f.name)}">${esc(f.name)}</option>`).join('')}</select><button type="button" id="dm-move">移す</button></div></section>` : ''}
     <section><div class="row"><button type="button" id="dm-dup">複製</button><button type="button" class="danger" id="dm-del">削除</button><span class="sp"></span><button type="button" class="pri" id="dm-close">閉じる</button></div></section>
   </div></div>`;
@@ -193,7 +193,7 @@ function folderMenu(f, confirming = false) {
   }
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="フォルダの操作">
     <h2>${esc(f.name)}</h2><p>原稿 ${docs.length}本　レギュラー ${f.cast.length}人</p>
-    <section><h3>名前を変える</h3><div class="row"><input type="text" id="fm-name" name="folder-title" value="${esc(f.name)}" aria-label="フォルダの名前" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1" enterkeyhint="done"><button type="button" id="fm-ren">変更</button></div><p class="err" id="fm-err"></p></section>
+    <section><h3>名前を変える</h3><div class="row"><input type="search" enterkeyhint="done" id="fm-name" name="folder-title" value="${esc(f.name)}" aria-label="フォルダの名前" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1"><button type="button" id="fm-ren">変更</button></div><p class="err" id="fm-err"></p></section>
     <section><div class="row"><button type="button" id="fm-cast">キャラ表（レギュラー）</button><button type="button" class="danger" id="fm-del">フォルダを削除</button><span class="sp"></span><button type="button" class="pri" id="fm-close">閉じる</button></div></section>
   </div></div>`;
   const rename = async () => {
@@ -229,7 +229,7 @@ function castSheet(f) {
     const box = $('fcl');
     f.cast.forEach(c => {
       const r = document.createElement('div'); r.className = 'cast';
-      r.innerHTML = `<button type="button" class="swatch" aria-label="色を変える" style="--c:${c.color}"></button><input type="text" id="fcn-${c.id}" name="chara-${c.id}" value="${esc(c.name)}" placeholder="名前" aria-label="キャラ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="danger">消す</button>`;
+      r.innerHTML = `<button type="button" class="swatch" aria-label="色を変える" style="--c:${c.color}"></button><input type="search" enterkeyhint="done" id="fcn-${c.id}" name="chara-${c.id}" value="${esc(c.name)}" placeholder="名前" aria-label="キャラ" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="danger">消す</button>`;
       r.children[0].onclick = () => { c.color = COLORS[(COLORS.indexOf(c.color) + 1) % COLORS.length]; draw(); };
       r.children[1].oninput = e => { c.name = e.target.value.replace(/[：:]/g, ''); };
       r.children[2].onclick = () => { f.cast.splice(f.cast.indexOf(c), 1); draw(); };

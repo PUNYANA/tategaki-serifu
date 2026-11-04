@@ -214,3 +214,8 @@ body.kb.in-editor.editing #kbdone{display:block}
 .blk{height:var(--col)}
 .div{height:calc(var(--col) + 115px - 100px)}
 .newcol{height:calc(var(--col) + 111px)}
+/* 名前の入力欄は「検索欄」にしている（Safari は検索欄に連絡先・住所の自動入力を出さない）。見た目は普通の入力欄と同じにする */
+input[type=search]{-webkit-appearance:none;appearance:none}
+input[type=search]::-webkit-search-cancel-button,input[type=search]::-webkit-search-decoration{-webkit-appearance:none;display:none}
+.sheet input[type=search]{font:inherit;font-size:16px;padding:8px 10px;border-radius:8px;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);min-width:0}
+.cast input[type=search]{flex:1}
