@@ -14,25 +14,21 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
-<link rel="stylesheet" href="css/app.css?v=5">
-<script type="module" src="js/main.js?v=5"></script>
+<link rel="stylesheet" href="css/app.css?v=6">
+<script type="module" src="js/main.js?v=6"></script>
 </head>
 <body>
 <!-- iOS の「連絡先を自動入力」を抑えるため、入力欄を自動入力オフのフォームに入れる（送信はしない） -->
 <form id="root" autocomplete="off" novalidate onsubmit="return false">
 <div id="app">
   <header>
-    <button type="button" id="back" hidden>‹ 一覧</button>
     <h1 id="title">縦書きセリフ帳</h1>
-    <span id="stats" hidden></span>
     <span id="hdr"></span>
   </header>
   <main id="listview" hidden></main>
   <div id="editview" hidden>
     <div id="pos" aria-hidden="true"><div class="track"></div><span class="pg"></span></div>
-    <div id="hint"></div>
     <div id="canvas" aria-label="原稿"></div>
-    <div id="castrow"></div>
     <div id="bar"></div>
   </div>
 </div>

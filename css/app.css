@@ -19,9 +19,6 @@ body{background:var(--paper);color:var(--ink);font-family:var(--f-ui);overflow:h
 #app{height:100%;display:flex;flex-direction:column}
 header{display:flex;align-items:center;gap:12px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--rule)}
 header h1{font-family:var(--f-text);font-size:17px;margin:0;font-weight:700;letter-spacing:.08em}
-#stats{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
-#hint{font-size:12px;color:var(--muted);height:1.5em;white-space:nowrap;text-overflow:ellipsis;line-height:1.5;overflow:hidden;padding-block:6px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-#hint b{color:var(--ink)}
 #canvas{flex:1;min-height:0;writing-mode:vertical-rl;overflow-x:auto;overflow-y:hidden;
   padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
@@ -50,8 +47,6 @@ header h1{font-family:var(--f-text);font-size:17px;margin:0;font-weight:700;lett
 .pick{bottom:0;height:52px;flex-direction:column;gap:3px;cursor:pointer;touch-action:none}
 .pick i{width:20px;height:20px;border-radius:50%;border:2px solid var(--muted);box-sizing:border-box;display:block}
 .sel .pick i{background:var(--sel-edge);border-color:var(--sel-edge);box-shadow:inset 0 0 0 3px var(--sheet)}
-.cnt{font-family:var(--f-ui);font-size:10px;color:var(--muted);letter-spacing:0;font-variant-numeric:tabular-nums}
-.cnt.over{color:var(--warn);font-weight:700}
 .tcy{text-combine-upright:all;-webkit-text-combine:horizontal}
 .slot{width:16px;flex:none;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;color:var(--muted);font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:4px}
 .slot span{writing-mode:horizontal-tb;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;font-family:var(--f-ui);font-weight:700;opacity:.55}
@@ -72,16 +67,6 @@ textarea.inl{writing-mode:vertical-rl;font-family:var(--f-text);font-size:21px;l
 #bar{background:var(--bar);border-top:1px solid var(--rule);padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;align-items:center}
 #bar::-webkit-scrollbar{display:none}
-#castrow{background:var(--bar);border-top:1px solid var(--rule);padding-block:8px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
-  display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;align-items:center}
-#castrow::-webkit-scrollbar{display:none}
-#castrow+#bar{border-top:0}
-#castrow .lab{font-size:11px;color:var(--muted);flex:none;letter-spacing:.05em}
-#castrow button.chip{min-height:38px;padding:6px 14px;touch-action:pan-x}
-button.chip.paint{background:var(--c);color:#fff;box-shadow:0 0 0 3px var(--paper),0 0 0 5px var(--c)}
-body.painting .blk{cursor:copy}
-.blk.flash{animation:fl .35s}
-@keyframes fl{from{background:var(--sel)}}
 #canvas.panning{cursor:grabbing}
 .sp{flex:1}
 button{font-family:var(--f-ui);font-size:14px;font-weight:700;color:var(--btn-fg);background:var(--btn);border:1px solid var(--rule);flex:none;
@@ -117,13 +102,12 @@ button.chip.none{border-style:dashed;color:var(--muted);font-weight:400}
 #toast.show{opacity:1}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 
-/* ---- ここから PWA 化で足した分（一覧画面・ヘッダー） ---- */
+/* ---- ここから PWA 化と実機確認で足した分 ---- */
 body{margin:0}
 [hidden]{display:none!important}
 #editview{flex:1;min-height:0;display:flex;flex-direction:column}
 header{min-height:37px}
 header h1{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#back{min-height:34px;padding:4px 10px;font-size:13px}
 #hdr{margin-left:auto;display:flex;gap:8px}
 #hdr button{min-height:34px;padding:4px 12px;font-size:13px}
 #listview{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
@@ -146,8 +130,8 @@ header h1{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* キーボード表示中も #app を見えている範囲に合わせる（高さと位置は main.js が visualViewport から入れる） */
 #app{position:fixed;top:0;left:0;right:0;height:100%;will-change:transform}
 /* 画面に出るキーボードが出ている間（body.kb）：本文を広く使う。
-   次のセリフへ＝改行2回、完了＝キーボードの✓、話者＝枠の上の名前、で代わりになるので下の2列も隠す */
-body.kb.in-editor header,body.kb.in-editor #hint,body.kb.in-editor #castrow,body.kb.in-editor #bar{display:none}
+   次のセリフへ＝改行2回、完了＝キーボードの✓、話者＝枠の上の名前、で代わりになるので下のボタン列も隠す */
+body.kb.in-editor #bar{display:none}
 body.kb.in-editor #canvas{padding-block:4px}
 body.kb.in-editor .blk{padding-top:34px;padding-bottom:12px}
 body.kb.in-editor .div{padding-top:8px;padding-bottom:12px}
@@ -156,12 +140,6 @@ body.kb.in-editor .who{top:3px}
 /* 最後尾のセリフが左端に貼りつかないよう、末尾に余白 */
 .tail{flex:none;width:min(40vw,320px);height:1px}
 #root{margin:0}
-/* 話者の列をなくしたので、下のボタンの列に上の線を戻す */
-#castrow[hidden]+#bar{border-top:1px solid var(--rule)}
-/* iPhone の幅でも下のボタンが1列に収まるよう、狭い画面では余白を詰める */
-@media (max-width:430px){#bar{gap:5px}#bar button{padding-inline:9px}}
-/* 編集画面：上のバーとヒント行は出さない。文字数も出さない */
-#hint{display:none}
 .blk{padding-bottom:44px}
 .pick{height:40px}
 #bar button.back{font-size:20px;line-height:1;padding-inline:12px}
@@ -169,8 +147,6 @@ body.kb.in-editor .who{top:3px}
 /* ダブルタップ・ピンチで拡大しない（横スクロール・縦スクロールはそのまま） */
 html,body{touch-action:pan-x pan-y}
 button,.slot,.newcol,.who{touch-action:manipulation}
-@media (max-width:430px){#bar{gap:4px}#bar button,#bar button.back,#bar button.ur{padding-inline:8px}#bar button.ur{min-width:38px}}
-@media (max-width:430px){#bar{padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}}
 /* 上の細い位置表示 */
 #pos{display:flex;align-items:center;gap:8px;height:14px;flex:none;
   padding-top:max(4px,env(safe-area-inset-top,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
@@ -178,7 +154,11 @@ button,.slot,.newcol,.who{touch-action:manipulation}
 #pos .thumb{position:absolute;top:-1px;height:4px;background:var(--accent);border-radius:2px}
 #pos b{position:absolute;top:-3px;width:1px;height:8px;background:var(--muted);opacity:.7}
 #pos .pg{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:3.2em;text-align:right;letter-spacing:.02em}
-#strip{display:block;height:100%;position:relative}
+/* 下のボタン列：iPhone の幅でも1列に収まるよう、狭い画面では余白を詰める */
+@media (max-width:430px){
+  #bar{gap:4px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
+  #bar button,#bar button.back,#bar button.ur{padding-inline:8px}
+  #bar button.ur{min-width:38px}
+}
 /* スマホではタップのあと「＋」が青いまま残る（:hover が残る）ので、押している間だけ青くする */
 @media (hover:none){.slot:hover:not(:active) span{background:transparent;color:inherit;opacity:.55}}
-#editview{position:relative}

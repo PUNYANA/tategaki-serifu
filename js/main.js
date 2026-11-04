@@ -1,8 +1,8 @@
 // 起動と、一覧⇔編集の切り替え
-import { $, toast } from './ui.js?v=5';
-import * as db from './db.js?v=5';
-import { openEditor, closeEditor, setLimit, setOnBack, SAMPLE, SAMPLE_CAST } from './editor.js?v=5';
-import { initList, renderList, newDoc } from './list.js?v=5';
+import { $, toast } from './ui.js?v=6';
+import * as db from './db.js?v=6';
+import { openEditor, closeEditor, setOnBack, SAMPLE, SAMPLE_CAST } from './editor.js?v=6';
+import { initList, renderList, newDoc } from './list.js?v=6';
 
 const state = { folders: [], docs: [] };
 
@@ -21,11 +21,10 @@ function showList() {
   document.body.classList.remove('in-editor');
   $('editview').hidden = true; $('listview').hidden = false;
   document.querySelector('header').hidden = false;
-  $('title').textContent = '縦書きセリフ帳';
   renderList();
 }
 
-// キーボードが出たら、画面全体を「見えている範囲」に合わせて縮める（仕様書 7：下のバーを持ち上げる）。
+// キーボードが出たら、画面全体を「見えている範囲」に合わせて縮める（仕様書 5-2）。
 // iOS はキーボードを出すとき画面ごと押し上げてスクロールさせるので、見えている範囲に貼りつけて追いかける
 const vv = window.visualViewport;
 if (vv) {
@@ -51,7 +50,7 @@ async function boot() {
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
   // 前回 IndexedDB に入らずに退避した分を戻す
   try { if (await db.restoreStash()) toast('前回保存しきれなかった分を戻しました'); } catch (e) { console.error(e); }
-  let [folders, docs, last, limit] = await Promise.all([db.all('folders'), db.all('docs'), db.getMeta('last'), db.getMeta('limit')]);
+  let [folders, docs, last] = await Promise.all([db.all('folders'), db.all('docs'), db.getMeta('last')]);
   if (!folders.length && !docs.length) { // 初回：ネタ帳フォルダにサンプルを1本
     const cast = SAMPLE_CAST.map(c => ({ ...c, aliases: [] }));
     const f = { name: 'ネタ帳', cast, created: Date.now() };
@@ -60,7 +59,6 @@ async function boot() {
     folders = [f]; docs = [d];
   }
   state.folders = folders; state.docs = docs;
-  if (limit) setLimit(limit);
   initList(state, showEditor);
   setOnBack(showList);
   const d = last && docs.find(x => x.id === last);

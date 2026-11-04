@@ -1,8 +1,8 @@
-// 原稿の編集画面。docs/tategaki-prototype.html の挙動をそのまま移したもの。
-// 試作版との違いは「どこに保存するか」だけ（localStorage → IndexedDB の .txt 形式、キャラ表は作品フォルダごと）。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=5';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, COLORS, count, splitParas } from './textfile.js?v=5';
-import * as db from './db.js?v=5';
+// 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
+// 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
+import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=6';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, COLORS, splitParas } from './textfile.js?v=6';
+import * as db from './db.js?v=6';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -23,7 +23,7 @@ export const SAMPLE = [
 
 let uid = 1;
 const mk = o => ({ id: uid++, type: o.type, text: o.text || '', who: o.who || null });
-let st = { items: [], cast: [], limit: 30 };
+let st = { items: [], cast: [] };
 let cur = null;      // { doc, folder, meta } 開いている原稿
 let active = false;  // 編集画面を表示中か
 let saveT = 0;
@@ -60,25 +60,23 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', () => { if (active) save(); });
 
-export function setLimit(n) { st.limit = n; }
 let onBack = null;
 export function setOnBack(fn) { onBack = fn; }
 export function openEditor(doc, folder) {
   const p = parseDoc(doc.text, folder.cast);
   cur = { doc, folder, meta: p.meta };
-  st = { items: p.items.map(mk), cast: folder.cast, limit: st.limit };
-  sel = new Set(); undo.length = 0; redo.length = 0; editing = null; paint = null; g = null;
+  st = { items: p.items.map(mk), cast: folder.cast };
+  sel = new Set(); undo.length = 0; redo.length = 0; editing = null; lock = null; g = null;
   active = true; closeLayer(); closePop();
-  $('title').textContent = doc.name;
-  off = null; cv.classList.remove('locked'); allowJumpFor(500); render(); cv.scrollLeft = 0; lastSl = 0;
+  allowJumpFor(500); render(); cv.scrollLeft = 0; lastSl = 0;
   if (p.added) save();
 }
 export function closeEditor() {
   if (!active) return;
   if (editing) finishEdit();
   closePop(); closeLayer(); save();
-  active = false; cur = null; paint = null; g = null; sel.clear();
-  off = null; cv.classList.remove('locked'); cv.innerHTML = ''; const o = $('inl'); o && o.remove();
+  active = false; cur = null; lock = null; g = null; sel.clear();
+  cv.innerHTML = '';
 }
 
 const fmt = s => esc(s).replace(/(^|[^0-9])([0-9]{2})(?![0-9])/g, '$1<span class="tcy">$2</span>').replace(/(!\?|\?!|!!|\?\?)/g, '<span class="tcy">$1</span>');
@@ -87,23 +85,9 @@ const who = id => st.cast.find(c => c.id === id) || null;
 function chipBtn(c, on, fn) { const b = btn(c.name, fn, 'chip' + (on ? ' on' : '')); b.style.setProperty('--c', c.color); return b; }
 
 /* ---- 横スクロールの位置 ----
-   書いていない間：ふつうのスクロール（cv.scrollLeft）。
-   書いている間（固定モード）：#canvas をスクロールできない状態（overflow:clip）にして、中身の #strip を translate でずらす。
-   iOS は入力中のカーソルを見せようとして、スクロールできる箱を勝手に動かす（縦書きでは先頭へ飛ばしたり端へ詰めたり、
-   戻すと震えたりする）。動かせる箱をなくしてしまえば手を出せない。指でのスワイプはアプリが受け取ってずらす。 */
-let off = null; // 固定モード中の位置。scrollLeft と同じ向き（0＝書き出し＝右端、左へ進むほど負）
-function contentW() {
-  const s = $('strip'); if (!s) return cv.clientWidth; const cs = getComputedStyle(cv);
-  return s.offsetWidth + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-}
-const getSL = () => off != null ? off : cv.scrollLeft;
-function setSL(v) {
-  if (off == null) { cv.scrollLeft = v; placeTa(); return; }
-  off = Math.max(Math.min(0, cv.clientWidth - contentW()), Math.min(0, v));
-  // transform は使わない（iOS で入力欄の文字が描かれなくなることがあるため）。位置指定でずらす
-  const s = $('strip'); if (s) s.style.left = off ? `${-off}px` : '';
-  drawPos();
-}
+   縦書きなので scrollLeft は 0＝書き出し（右端）で、左へ進むほど負になる */
+const getSL = () => cv.scrollLeft;
+const setSL = v => { cv.scrollLeft = v; };
 
 /* ---- 描画 ---- */
 const leadPage = () => st.items.length && st.items[0].type !== 'div' ? 1 : 0;
@@ -124,7 +108,7 @@ function render() {
   if (!editing) h += slot(st.items.length) + '<div class="newcol" role="button" tabindex="0">ここをタップして書く</div>';
   // 中身を入れ替えても横の位置を保つ
   const sl = cv.scrollLeft;
-  cv.innerHTML = `<div id="strip">${h}<div class="tail" aria-hidden="true"></div></div>`;
+  cv.innerHTML = h + '<div class="tail" aria-hidden="true"></div>';
   cv.scrollLeft = sl; lastSl = cv.scrollLeft;
   const ta = $('inl');
   if (ta) { ta.value = st.items[idx(editing.id)].text; fitTa(); }
@@ -138,30 +122,18 @@ function render() {
   renderBar();
 }
 function paintSel() { cv.querySelectorAll('[data-i]').forEach(el => el.classList.toggle('sel', sel.has(st.items[+el.dataset.i].id))); renderBar(); }
-let paint = null; // 話者を塗っているキャラid
-function renderCast(curWho, onTap) {
-  const row = $('castrow'); row.innerHTML = '';
-  const lab = document.createElement('span'); lab.className = 'lab'; lab.textContent = '話者'; row.appendChild(lab);
-  st.cast.forEach(c => { const b = chipBtn(c, curWho === c.id, () => { if (suppressClick) { suppressClick = false; return; } onTap(c.id); }); b.dataset.cid = c.id; if (paint === c.id) b.classList.add('paint'); row.appendChild(b); });
-  row.appendChild(btn(st.cast.length ? 'キャラ表' : '＋ キャラを登録', () => { if (editing) finishEdit(); paint = null; openCast(); }, '', false));
-  if (editing) row.querySelectorAll('button').forEach(b => b.addEventListener('pointerdown', e => e.preventDefault()));
-}
+// 下のボタン列。話者は枠の上の名前をタップしてつける（下に話者の列は置かない）
 function renderBar() {
-  // 下の話者の列は使わない（話者は枠の上の名前をタップしてつける。複数選んでいればまとめてつく）
-  const bar = $('bar'); bar.innerHTML = ''; paint = null; document.body.classList.remove('painting');
-  const row = $('castrow'); row.innerHTML = ''; row.hidden = true;
+  const bar = $('bar'); bar.innerHTML = '';
   if (editing) {
-    $('hint').innerHTML = '改行＝吹き出しの中の改行／<b>改行2回</b>で次のセリフへ／上の名前で話者';
     const els = [spacer(), btn('次のセリフへ', nextSerifu, 'pri'), btn('完了', finishEdit)];
     els.forEach(b => b.addEventListener('pointerdown', e => e.preventDefault()));
     bar.append(...els); return;
   }
   if (sel.size) {
-    $('hint').innerHTML = `<b>${sel.size}件</b>選択中　枠の上の名前を押すとまとめて話者がつく`;
     bar.append(btn('話者なし', () => { commit(() => st.items.forEach(i => { if (sel.has(i.id)) i.who = null; })); render(); }), btn('まとめる', doMerge, '', sel.size < 2), btn('削除', doDelete, 'danger'), btn('出力', openMenu), btn('区切り', addDiv), spacer(), btn('解除', () => { sel.clear(); paintSel(); }, 'pri'));
     return;
   }
-  $('hint').innerHTML = '話者は 枠の上の名前の位置をタップ';
   // 編集画面には上のバーを置かない。一覧へ・元に戻す／やり直しもこの列にまとめる
   const back = btn('‹', () => onBack && onBack(), 'back'); back.setAttribute('aria-label', '一覧へ戻る');
   bar.append(back, btn('出力・変換', openMenu), btn(st.cast.length ? 'キャラ表' : '＋ キャラ', () => openCast()), spacer(),
@@ -218,17 +190,15 @@ window.addEventListener('app-resize', () => {
   }
   anchor = null;
   keepVisible();
-  if (off == null) lastSl = cv.scrollLeft; // アプリが合わせた位置を正しい位置として覚える
+  lastSl = cv.scrollLeft; // アプリが合わせた位置を正しい位置として覚える
   drawPos();
 });
 function pickAnchor() {
   const c = cv.getBoundingClientRect();
-  let el = cv.querySelector('.blk.editing');
-  if (!el) { const p = document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2); el = p && p.closest && p.closest('[data-i]'); }
-  if (!el) return null;
-  return { editing: el.classList.contains('editing'), i: +el.dataset.i, dx: el.getBoundingClientRect().right - c.right };
+  const p = document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2), el = p && p.closest && p.closest('[data-i]');
+  return el ? { i: +el.dataset.i, dx: el.getBoundingClientRect().right - c.right } : null;
 }
-// 入力欄の大きさを中身に合わせる（試作版と同じ）
+// 入力欄の大きさを中身に合わせる（試作版と同じ。入力欄は枠の中に置く：仕様書 5-2 の「試してやめた方式」参照）
 function fitTa() {
   const ta = $('inl'); if (!ta) return; const blk = ta.parentElement; const cs = getComputedStyle(blk);
   // 枠の上下の余白（通常とキーボード表示中で違う）を引いた分を入力欄の高さにする
@@ -238,7 +208,6 @@ function fitTa() {
   ta.style.height = Math.max(60, blk.clientHeight - pad) + 'px'; ta.style.width = '1.9em'; ta.style.width = Math.max(ta.scrollWidth, 30) + 'px';
   if (cv.scrollLeft !== sl) cv.scrollLeft = sl;
 }
-const placeTa = () => { }; // 入力欄を重ねる方式はやめた（入力欄は枠の中）
 // 書いている枠が画面からはみ出しそうなときだけ動かす。
 // 左へはみ出しそう（最後尾で書いていて列が増えたなど）なら、左端に詰めず、画面の左から30%あたりまで寄せて余裕を作る
 function keepVisible() {
@@ -249,7 +218,7 @@ function keepVisible() {
     if (r.right - d > c.right - 8) d = r.right - (c.right - 8); // 書き出し（右端）は画面内に残す
     setSL(getSL() + d);
   } else if (r.right > c.right) setSL(getSL() + r.right - c.right);
-  if (off == null) lastSl = cv.scrollLeft;
+  lastSl = cv.scrollLeft;
   if (lock) lock.dx = editDx(); // アプリが動かした位置を、新しい固定位置にする
 }
 // 書いている枠の右端（セリフの書き出し側）が、画面の右端からどれだけ離れているか
@@ -258,12 +227,12 @@ function editDx() { const b = cv.querySelector('.blk.editing'); return b ? b.get
 function pin() {
   const d = editDx(); if (d == null || !lock) return;
   if (Math.abs(d - lock.dx) > 1) setSL(getSL() + d - lock.dx);
-  if (off == null) lastSl = cv.scrollLeft;
+  lastSl = cv.scrollLeft;
 }
 // 書き始めはキーボードが開く瞬間。iOS が勝手にスクロールしても、タップした枠を画面上のその位置に留める
 let lock = null;
 function startEdit(id, isNew = false, before = snap()) {
-  sel.clear(); paint = null; editing = { id, before, isNew, dirty: false }; lock = null; render();
+  sel.clear(); editing = { id, before, isNew, dirty: false }; lock = null; render();
   lock = { dx: editDx() }; keepVisible();
   requestAnimationFrame(() => { pin(); keepVisible(); });
 }
@@ -293,22 +262,8 @@ function applyEdit() {
 function finishEdit() { if (!editing) return; applyEdit(); render(); }
 function nextSerifu() { if (!editing) return; const last = applyEdit(); const before = snap(); const it = mk({ type: 'line' }); st.items.splice(last + 1, 0, it); startEdit(it.id, true, before); }
 
-/* ---- 話者ピッカー ---- */
-function openPicker(ids) {
-  if (editing) finishEdit();
-  const items = ids.map(id => st.items[idx(id)]).filter(i => i && i.type === 'line'); if (!items.length) { toast('区切りには話者をつけられません'); return; }
-  const cur = items.every(i => i.who === items[0].who) ? items[0].who : undefined;
-  $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="話者">
-    <h2>${items.length > 1 ? items.length + '件の' : 'この'}セリフは誰？</h2><div class="row" id="pk"></div>
-    <div class="row"><button type="button" id="pk-edit">キャラ表を編集</button><span class="sp"></span><button type="button" id="pk-close">閉じる</button></div></div></div>`;
-  const set = w => { commit(() => items.forEach(i => i.who = w)); closeLayer(); render(); };
-  $('pk').append(...st.cast.map(c => chipBtn(c, c.id === cur, () => set(c.id))), btn('なし', () => set(null), 'chip none'));
-  $('pk-close').onclick = closeLayer; $('pk-edit').onclick = () => openCast(() => openPicker(ids));
-  bgClose(closeLayer);
-}
-
 /* ---- キャラ表 ---- */
-function openCast(back) {
+function openCast() {
   const before = snap();
   const oldNames = new Map(st.cast.map(c => [c.id, c.name]));
   const close = () => {
@@ -318,7 +273,7 @@ function openCast(back) {
       const old = oldNames.get(c.id);
       if (old && old !== c.name) c.aliases = [...new Set([...(c.aliases || []), old])].filter(a => a !== c.name);
     });
-    if (snap() !== before) pushUndo(before); save(); closeLayer(); back ? back() : render();
+    if (snap() !== before) pushUndo(before); save(); closeLayer(); render();
   };
   const draw = () => {
     $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="キャラ表">
@@ -432,7 +387,7 @@ function drawPos() {
 }
 function drawPosNow() {
   const box = $('pos'); if (!box || !active) return;
-  const W = contentW(), V = cv.clientWidth, from = -getSL(); // from：書き出し（右端）から見ている位置までの距離
+  const W = cv.scrollWidth, V = cv.clientWidth, from = -getSL(); // from：書き出し（右端）から見ている位置までの距離
   const c = cv.getBoundingClientRect(), right = c.right + from;         // 原稿の右端の画面上の位置
   if (!posTicks) {
     posTicks = [...cv.querySelectorAll('.div')].map(el => right - el.getBoundingClientRect().right);
@@ -483,7 +438,6 @@ cv.addEventListener('scroll', () => {
     cv.scrollLeft = lastSl; return;
   }
   lastSl = sl;
-  placeTa(); // 重ねている入力欄を、スクロールした枠に合わせて動かす
   drawPos();
 });
 
@@ -491,15 +445,8 @@ cv.addEventListener('scroll', () => {
 let g = null;
 const pt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest ? el : null; };
 function autoScroll(x, y) { if (Math.hypot(x - g.x0, y - g.y0) < 30) return; const rc = cv.getBoundingClientRect(); if (x < rc.left + 32) setSL(getSL() - 14); else if (x > rc.right - 32) setSL(getSL() + 14); }
-let suppressClick = false;
-$('castrow').addEventListener('pointerdown', e => {
-  const b = e.target.closest('button.chip'); if (!b || editing) return;
-  g = { kind: 'chip', cid: b.dataset.cid, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, started: false };
-});
-cv.addEventListener('wheel', e => {
-  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { setSL(getSL() - e.deltaY); e.preventDefault(); }
-  else if (off != null) { setSL(getSL() + e.deltaX); e.preventDefault(); } // 固定モード中はトラックパッドの横スクロールもアプリが受け取る
-}, { passive: false });
+// マウスのホイール（縦回し）でも横にスクロールする
+cv.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { setSL(getSL() - e.deltaY); e.preventDefault(); } }, { passive: false });
 cv.addEventListener('pointerdown', e => {
   if (e.target.closest('textarea')) return;
   if (!e.target.closest('[data-i],.slot,.newcol') && e.pointerType !== 'touch') { g = { kind: 'pan', x: e.clientX, y: e.clientY, sl: getSL(), mouse: true, moving: true }; return; }
@@ -526,7 +473,6 @@ function startDrag() {
   const gh = document.createElement('div'); gh.id = 'ghost';
   gh.innerHTML = `<span>${esc(first.type === 'div' ? '区切り' : (first.text || '').split('\n')[0].slice(0, 8))}</span>${g.ids.size > 1 ? `<b>${g.ids.size}</b>` : ''}`; document.body.appendChild(gh);
   cv.querySelectorAll('[data-i]').forEach(el => { if (g.ids.has(st.items[+el.dataset.i].id)) el.classList.add('lift'); });
-  $('hint').innerHTML = 'すき間か、ブロックの<b>右・左のふち</b>で離すとそこへ移動／<b>真ん中</b>で離すと入れ替え';
 }
 function clearDrop() { cv.querySelectorAll('.drop-before,.drop-after,.drop-swap,.drop-at').forEach(el => el.classList.remove('drop-before', 'drop-after', 'drop-swap', 'drop-at')); }
 window.addEventListener('pointermove', e => {
@@ -534,15 +480,6 @@ window.addEventListener('pointermove', e => {
   if (g.kind === 'tap' && g.mouse && Math.abs(e.clientX - g.x) > 8) { g.kind = 'pan'; g.moving = true; cv.classList.add('panning'); }
   if (g.kind === 'pan') { if (g.moving) setSL(g.sl - (e.clientX - g.x)); return; }
   if (g.kind === 'tap' || g.kind === 'tapslot' || g.kind === 'who') { if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 8) g = null; return; }
-  if (g.kind === 'chip') {
-    if (!g.started) {
-      if (g.y - e.clientY < 12 || Math.abs(e.clientX - g.x) > Math.abs(e.clientY - g.y)) return; g.started = true; suppressClick = true;
-      const c = who(g.cid); const gh = document.createElement('div'); gh.id = 'ghost'; gh.style.borderColor = c.color; gh.innerHTML = `<span>${esc(c.name)}</span>`; document.body.appendChild(gh);
-      $('hint').innerHTML = 'セリフの上で離すと話者がつく';
-    }
-    const gh = $('ghost'); gh.style.left = e.clientX + 'px'; gh.style.top = e.clientY + 'px'; clearDrop(); g.drop = null;
-    const el = pt(e.clientX, e.clientY); const b = el && el.closest('.blk'); if (b) { g.drop = +b.dataset.i; b.classList.add('drop-swap'); } return;
-  }
   autoScroll(e.clientX, e.clientY);
   const el = pt(e.clientX, e.clientY);
   if (g.kind === 'pick') { const b = el && el.closest('[data-i]'); if (b) applyPick(+b.dataset.i); return; }
@@ -559,41 +496,14 @@ window.addEventListener('pointermove', e => {
 // iOS は pointerdown を止めてもフォーカスが移ることがあるので touchstart でも止める（pointerup は届くのでポップアップは開く）
 cv.addEventListener('touchstart', e => { if (editing && e.target.closest('.blk.editing .who')) e.preventDefault(); }, { passive: false });
 cv.addEventListener('touchmove', e => { if (g && (g.kind === 'pick' || g.kind === 'drag')) e.preventDefault(); }, { passive: false });
-
-/* ---- 固定モード中の指スワイプ（アプリが受け取ってずらす。離したあとは惰性で少し流れる） ---- */
-let tp = null, flingRaf = 0;
-cv.addEventListener('touchstart', e => {
-  cancelAnimationFrame(flingRaf);
-  if (off == null || e.touches.length !== 1 || e.target.closest('.grip,.pick')) { tp = null; return; }
-  const t = e.touches[0]; tp = { x: t.clientX, y: t.clientY, o: off, on: false, vx: 0, lx: t.clientX, lt: performance.now() };
-}, { passive: true });
-cv.addEventListener('touchmove', e => {
-  if (!tp || off == null) return; const t = e.touches[0]; const dx = t.clientX - tp.x, dy = t.clientY - tp.y;
-  if (!tp.on) { if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return; tp.on = true; g = null; }
-  e.preventDefault();
-  const now = performance.now(); tp.vx = (t.clientX - tp.lx) / Math.max(1, now - tp.lt); tp.lx = t.clientX; tp.lt = now;
-  setSL(tp.o - dx); if (lock) lock.dx = editDx();
-}, { passive: false });
-cv.addEventListener('touchend', () => {
-  if (!tp || !tp.on || off == null) { tp = null; return; }
-  let v = tp.vx * 16; tp = null; // 1コマあたりの移動量
-  const step = () => { if (off == null || Math.abs(v) < 0.5) return; setSL(getSL() - v); if (lock) lock.dx = editDx(); v *= 0.94; flingRaf = requestAnimationFrame(step); };
-  if (Math.abs(v) > 2) flingRaf = requestAnimationFrame(step);
-}, { passive: true });
-$('castrow').addEventListener('touchmove', e => { if (g && g.kind === 'chip' && g.started) e.preventDefault(); }, { passive: false });
 function end(cancel) {
   if (!g) return; const p = g; g = null;
   // 押したまま横にスクロールしたあとで指を離したのは、タップではない（＋やセリフが反応しないように）
   if ((p.kind === 'tap' || p.kind === 'tapslot' || p.kind === 'who') && Math.abs(getSL() - p.sl) > 4) cancel = true;
   if (p.kind === 'who') { if (!cancel) openPop(p.id); return; }
   if (p.kind === 'pan') { cv.classList.remove('panning'); return; }
-  if (p.kind === 'chip') {
-    const gh = $('ghost'); gh && gh.remove(); clearDrop();
-    if (p.started) { setTimeout(() => { suppressClick = false; }, 50); if (!cancel && p.drop != null) { const it = st.items[p.drop]; commit(() => { it.who = p.cid; }); render(); toast(`${who(p.cid).name}をつけました`); } else renderBar(); } return;
-  }
   if (p.kind === 'tap') {
     if (cancel) return; const it = st.items[p.i]; if (!it) return;
-    if (paint && it.type === 'line') { commit(() => { it.who = it.who === paint ? null : paint; }); render(); const el = cv.querySelector(`[data-i="${p.i}"]`); el && el.classList.add('flash'); return; }
     if (it.type === 'line') startEdit(it.id); else if (editing) finishEdit(); return;
   }
   if (p.kind === 'tapslot') { if (!cancel) newAt(p.at); return; }

@@ -1,7 +1,7 @@
 // IndexedDB：端末内の保存（オフライン時の本体）
 // docs    : { id, folder, name, text(.txt形式), updated, stats:{lines,chars} }
 // folders : { name, cast:[{id,name,color,aliases}], created }
-// meta    : { k, v }  … last（最後に開いた原稿のid）, limit（文字数の目安）
+// meta    : { k, v }  … last（最後に開いた原稿のid）
 //
 // iPhone / iPad の Safari は、アプリを裏に回したりしばらく放置したりすると
 // IndexedDB の接続を勝手に切ることがある。切れていたら開き直して1回だけやり直す。
@@ -65,7 +65,9 @@ export async function restoreStash() {
   const p = readPending(); const ids = Object.keys(p); if (!ids.length) return 0;
   for (const id of ids) {
     const { doc, folder } = p[id]; const now = await get('docs', id);
-    if (!now || (now.updated || 0) <= (doc.updated || 0)) await saveDoc(doc, folder);
+    if (now && (now.updated || 0) > (doc.updated || 0)) continue; // 端末の方が新しければそのまま
+    // キャラ表は退避したあとに変えているかもしれないので、端末にないときだけ戻す（あれば上書きしない）
+    if (await get('folders', folder.name)) await put('docs', doc); else await saveDoc(doc, folder);
   }
   localStorage.removeItem(PKEY); return ids.length;
 }

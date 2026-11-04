@@ -1,7 +1,7 @@
 // 原稿一覧：作品フォルダごとに原稿を並べる（更新順）
-import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=5';
-import { serializeDoc, docStats, setTitle } from './textfile.js?v=5';
-import * as db from './db.js?v=5';
+import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=6';
+import { serializeDoc, docStats, setTitle } from './textfile.js?v=6';
+import * as db from './db.js?v=6';
 
 let S = null, onOpen = null;
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
