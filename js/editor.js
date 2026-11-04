@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=29';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=29';
-import * as db from './db.js?v=29';
-import * as sync from './sync.js?v=29';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=30';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=30';
+import * as db from './db.js?v=30';
+import * as sync from './sync.js?v=30';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -121,6 +121,7 @@ function render() {
   const sl = cv.scrollLeft;
   cv.innerHTML = h + '<div class="tail" aria-hidden="true"></div>';
   cv.scrollLeft = sl; lastSl = cv.scrollLeft;
+  if (typeof dlog === 'function') dlog(`render ${Math.round(sl)}→${Math.round(cv.scrollLeft)} w=${cv.scrollWidth}`);
   const ta = $('inl');
   if (ta) { ta.value = st.items[idx(editing.id)].text; fitTa(); }
   posTicks = null; drawPos();
@@ -551,10 +552,19 @@ cv.addEventListener('touchcancel', fingerUp, { passive: true });
 cv.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') mouseDown = true; }, true);
 window.addEventListener('pointerup', e => { if (e.pointerType !== 'touch') mouseDown = false; }, true);
 cv.addEventListener('wheel', () => allowJumpFor(400), { passive: true });
+/* ---- 調べもの用の記録（一時的）：横の位置がいつ何で動いたかを画面の左上に出す ---- */
+const DBG = true; let dbgT0 = Date.now(); const dbgLines = [];
+function dlog(s) {
+  if (!DBG) return; let el = $('dbg');
+  if (!el) { el = document.createElement('pre'); el.id = 'dbg'; el.style.cssText = 'position:fixed;left:4px;top:24px;z-index:99;pointer-events:none;margin:0;padding:4px 6px;font:10px/1.35 monospace;background:rgba(0,0,0,.72);color:#9f9;border-radius:6px;max-width:70vw;white-space:pre-wrap'; document.body.appendChild(el); }
+  dbgLines.push(((Date.now() - dbgT0) / 1000).toFixed(2) + ' ' + s); if (dbgLines.length > 16) dbgLines.shift(); el.textContent = dbgLines.join('\n');
+}
+window.addEventListener('pointerdown', e => { if (e.target.closest && e.target.closest('.grip')) { dbgT0 = Date.now(); dbgLines.length = 0; dlog('down sl=' + Math.round(cv.scrollLeft)); } }, true);
 cv.addEventListener('scroll', () => {
   if (!active) return;
   if (coasting) { clearTimeout(coastT); coastT = setTimeout(() => { coasting = false; }, 150); } // 惰性が続いている
   const sl = cv.scrollLeft;
+  if (DBG) dlog(`scr ${Math.round(sl)} last=${Math.round(lastSl)} hold=${hold && Date.now() < hold.until ? Math.round(hold.v) : '-'} u=${userScrolling() ? 1 : 0}${fingerDown ? 'F' : ''}${fingerMoved ? 'M' : ''}${coasting ? 'C' : ''} ed=${editing ? 1 : 0} act=${document.activeElement && document.activeElement.className || document.activeElement && document.activeElement.tagName}`);
   if (editing && lock) {
     if (userScrolling()) lock.dx = editDx();   // 人が動かした → その位置を新しい固定位置に
     else if (Math.abs(editDx() - lock.dx) > 1) {
@@ -653,7 +663,9 @@ let gestureEnd = 0;
 function afterGesture() { gestureEnd = Date.now(); }
 function holdPos() { hold = { v: cv.scrollLeft, until: Date.now() + 1500 }; lastSl = cv.scrollLeft; }
 const justGestured = () => Date.now() - gestureEnd < 500;
-cv.addEventListener('touchend', e => { if (justGestured() && e.cancelable) e.preventDefault(); }, { passive: false });
+cv.addEventListener('touchend', e => { dlog(`touchend jg=${justGestured() ? 1 : 0} can=${e.cancelable ? 1 : 0} sl=${Math.round(cv.scrollLeft)}`); if (justGestured() && e.cancelable) e.preventDefault(); }, { passive: false });
+['click', 'mousedown', 'focusin', 'focusout'].forEach(t => document.addEventListener(t, e => { dlog(`${t} ${e.target.className || e.target.tagName} sl=${Math.round(cv.scrollLeft)}`); }, true));
+['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, () => { if (g && g.kind === 'drag') dlog(`${t} sl=${Math.round(cv.scrollLeft)} drop=${g.drop ? g.drop.kind : '-'}`); }, true));
 ['click', 'mousedown', 'focusin'].forEach(t => document.addEventListener(t, e => {
   if (!justGestured() || !e.target.closest || !e.target.closest('#canvas')) return;
   if (t === 'focusin') { if (!e.target.closest('textarea')) { e.target.blur && e.target.blur(); cv.scrollLeft = hold ? hold.v : lastSl; } return; }
