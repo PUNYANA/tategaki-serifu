@@ -1,7 +1,7 @@
 // Dropbox API v2 の薄い窓口。ログインは OAuth 2.0 PKCE（サーバー不要・App secret 不要）
 // 権限は App folder（アプリ/縦書きセリフ帳/ 以下だけ）。パスはそのフォルダからの相対（"/作品/第1話.txt"）
-import { DROPBOX_APP_KEY } from './config.js?v=28';
-import * as db from './db.js?v=28';
+import { DROPBOX_APP_KEY } from './config.js?v=29';
+import * as db from './db.js?v=29';
 
 const AUTH = 'https://www.dropbox.com/oauth2/authorize';
 const TOKEN = 'https://api.dropboxapi.com/oauth2/token';

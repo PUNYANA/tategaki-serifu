@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=28';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=28';
-import * as db from './db.js?v=28';
-import * as sync from './sync.js?v=28';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=29';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=29';
+import * as db from './db.js?v=29';
+import * as sync from './sync.js?v=29';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -638,13 +638,27 @@ function end(cancel) {
     if (it.type === 'line') startEdit(it.id); else if (editing) finishEdit(); return;
   }
   if (p.kind === 'tapslot') { if (!cancel) newAt(p.at); return; }
-  if (p.kind === 'pick') return;
+  if (p.kind === 'pick') { afterGesture(); return; }
   const gh = $('ghost'); gh && gh.remove(); clearDrop();
-  if (!p.started || cancel || !p.drop) { render(); return; }
+  afterGesture();
+  if (!p.started || cancel || !p.drop) { render(); holdPos(); return; }
   if (p.drop.kind === 'swap') { if (swapIds(p.ids, p.drop.id)) toast('入れ替えました'); }
   else { moveTo(p.ids, p.drop.at); toast('移動しました'); }
-  render();
+  render(); holdPos();
 }
+/* つまみでの移動・丸でなぞる選択で指を離したあと：
+   描き直しで指の下のつまみが消えると、iOS は指を離した所（すき間の「＋」など）をタップしたことにして、
+   そこへフォーカスを移すときに縦書きを間違えて先頭へ飛ばす。そのタップを止め、1.5秒は位置を保つ */
+let gestureEnd = 0;
+function afterGesture() { gestureEnd = Date.now(); }
+function holdPos() { hold = { v: cv.scrollLeft, until: Date.now() + 1500 }; lastSl = cv.scrollLeft; }
+const justGestured = () => Date.now() - gestureEnd < 500;
+cv.addEventListener('touchend', e => { if (justGestured() && e.cancelable) e.preventDefault(); }, { passive: false });
+['click', 'mousedown', 'focusin'].forEach(t => document.addEventListener(t, e => {
+  if (!justGestured() || !e.target.closest || !e.target.closest('#canvas')) return;
+  if (t === 'focusin') { if (!e.target.closest('textarea')) { e.target.blur && e.target.blur(); cv.scrollLeft = hold ? hold.v : lastSl; } return; }
+  e.preventDefault(); e.stopPropagation();
+}, true));
 window.addEventListener('pointerup', () => end(false));
 window.addEventListener('pointercancel', () => end(true));
 cv.addEventListener('contextmenu', e => e.preventDefault());
