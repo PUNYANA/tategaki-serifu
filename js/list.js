@@ -1,8 +1,8 @@
 // 原稿一覧：作品フォルダごとに原稿を並べる（更新順）
-import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=13';
-import { serializeDoc, docStats, setTitle } from './textfile.js?v=13';
-import * as db from './db.js?v=13';
-import * as sync from './sync.js?v=13';
+import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=14';
+import { serializeDoc, docStats, setTitle } from './textfile.js?v=14';
+import * as db from './db.js?v=14';
+import * as sync from './sync.js?v=14';
 
 let S = null, onOpen = null;
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -119,7 +119,7 @@ function docMenu(d, confirming = false) {
   const rename = async () => {
     const v = $('dm-name').value.trim(); if (v === d.name) { closeLayer(); return; }
     const e = docCheck(d.folder, d)(v); if (e) { $('dm-err').textContent = e; return; }
-    d.name = v; d.text = setTitle(d.text, v); d.updated = Date.now(); d.dirty = true; await db.put('docs', d); sync.schedule();
+    d.name = v; d.text = setTitle(d.text, v); d.updated = Date.now(); d.dirty = true; d.sample = false; await db.put('docs', d); sync.schedule();
     closeLayer(); renderList(); toast('名前を変えました');
   };
   if (pair.length) $('dm-keep').onclick = async () => { const k = await sync.resolve(d); closeLayer(); renderList(); toast(`「${k.name}」の1本にしました`); };

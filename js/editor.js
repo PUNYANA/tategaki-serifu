@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=13';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=13';
-import * as db from './db.js?v=13';
-import * as sync from './sync.js?v=13';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=14';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=14';
+import * as db from './db.js?v=14';
+import * as sync from './sync.js?v=14';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -46,7 +46,7 @@ function save() {
   cur.folder.cast = st.cast;
   const text = serializeDoc({ title: cur.doc.name, meta: cur.meta, guests: st.guests, items }, st.cast);
   let changed = false;
-  if (text !== cur.doc.text) { cur.doc.text = text; cur.doc.updated = Date.now(); cur.doc.stats = docStats(items); cur.doc.dirty = true; changed = true; }
+  if (text !== cur.doc.text) { cur.doc.text = text; cur.doc.updated = Date.now(); cur.doc.stats = docStats(items); cur.doc.dirty = true; cur.doc.sample = false; changed = true; }
   // キャラ表（レギュラー）が変わっていたら、作品フォルダの _cast.json も送る
   const cj = JSON.stringify(st.cast); if (cj !== cur.castJson) { cur.castJson = cj; cur.folder.castDirty = true; changed = true; }
   const doc = cur.doc, folder = cur.folder;
@@ -440,6 +440,18 @@ cv.addEventListener('scroll', () => { if (!$('pop-g')) closePop(); }); // ゲス
 /* ---- 上の細い位置表示 ----
    線全体＝原稿全体（右が書き出し）。濃い部分＝いま画面に見えている範囲。目盛り＝ページの区切り。右に今のページ番号 */
 let posTicks = null, posRaf = 0;
+// 上の線をタップするとそこへ飛ぶ。なぞると原稿の中をすばやく移動できる（線の右端が書き出し）
+let posDrag = false;
+function posJump(x) {
+  const tr = $('pos').querySelector('.track').getBoundingClientRect(); if (!tr.width) return;
+  const ratio = Math.min(1, Math.max(0, (tr.right - x) / tr.width));
+  allowJumpFor(400); setSL(-(ratio * cv.scrollWidth - cv.clientWidth / 2)); lastSl = cv.scrollLeft;
+  if (lock) lock.dx = editDx();
+  drawPos();
+}
+$('pos').addEventListener('pointerdown', e => { if (!active) return; e.preventDefault(); posDrag = true; try { $('pos').setPointerCapture(e.pointerId); } catch (_) { } posJump(e.clientX); });
+$('pos').addEventListener('pointermove', e => { if (posDrag) posJump(e.clientX); });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => $('pos').addEventListener(t, () => { posDrag = false; }));
 sync.onChange(() => { if (active) drawSync(); });
 function drawPos() {
   if (posRaf) return;

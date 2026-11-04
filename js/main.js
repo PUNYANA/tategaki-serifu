@@ -1,10 +1,11 @@
 // 起動と、一覧⇔編集の切り替え
-import { $, toast } from './ui.js?v=13';
-import * as db from './db.js?v=13';
-import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=13';
-import { initList, renderList, newDoc } from './list.js?v=13';
-import * as sync from './sync.js?v=13';
-import { finishSignIn } from './dropbox.js?v=13';
+import { $, toast } from './ui.js?v=14';
+import * as db from './db.js?v=14';
+import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=14';
+import { initList, renderList, newDoc } from './list.js?v=14';
+import * as sync from './sync.js?v=14';
+import { finishSignIn } from './dropbox.js?v=14';
+import { setTitle } from './textfile.js?v=14';
 
 const state = { folders: [], docs: [] };
 
@@ -67,7 +68,7 @@ async function boot() {
   if (!folders.length && !docs.length) { // 初回：「サンプル」フォルダにサンプルの原稿を1本
     const cast = SAMPLE_CAST.map(c => ({ ...c, aliases: [] }));
     const f = { name: 'サンプル', cast, created: Date.now() };
-    const d = newDoc('サンプル', 'サンプル', SAMPLE, cast);
+    const d = newDoc('サンプル', 'サンプル', SAMPLE, cast); d.sample = true; // 一度も触っていないサンプル（Dropbox へは送らない）
     await db.put('folders', f); await db.put('docs', d);
     folders = [f]; docs = [d];
   }
@@ -79,10 +80,23 @@ async function boot() {
   // その窓は閉じてもらい、元のアプリに戻ってもらう（ログインの結果は元のアプリと共有される）
   if (justSignedIn && justSignedIn.inSheet) { showCloseNotice(); return; }
   await sync.init(state); sync.setFlush(flushSave);
+  await tidySamples();
   initList(state, showEditor);
   setOnBack(showList);
   const d = !justSignedIn && last && docs.find(x => x.id === last);
   d ? (showEditor(d), sync.sync()) : showList();
+}
+// 手つかずのサンプルを見分ける（前の版で作ったサンプルには印がないので、中身で見分ける）。
+// また、サンプルどうしの衝突でできてしまった「サンプル（〇〇の版）」のうち、中身が手つかずのサンプルのままのものは片づける
+async function tidySamples() {
+  const pristine = newDoc('サンプル', 'サンプル', SAMPLE, SAMPLE_CAST).text;
+  for (const d of [...state.docs]) {
+    if (d.folder !== 'サンプル') continue;
+    if (d.name === 'サンプル' && !d.sample && !d.rev && d.text === pristine) { d.sample = true; await db.put('docs', d); }
+    else if (/^サンプル（.+の版）$/.test(d.name) && setTitle(d.text, 'サンプル') === pristine) {
+      state.docs.splice(state.docs.indexOf(d), 1); await db.del('docs', d.id); await sync.removed(d);
+    }
+  }
 }
 function showCloseNotice() {
   document.querySelector('header').hidden = false; $('hdr').innerHTML = '';

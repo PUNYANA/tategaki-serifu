@@ -196,3 +196,11 @@ header{padding-top:calc(10px + env(safe-area-inset-top,0px))}
 #pos{padding-top:calc(max(4px,env(safe-area-inset-top,0px)) + 12px);padding-bottom:4px}
 #bar{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 body.kb.in-editor #canvas{padding-bottom:8px}
+/* 上の線はタップ・なぞりで移動できる */
+#pos{touch-action:none;cursor:pointer;-webkit-user-select:none;user-select:none}
+/* iOS 26 のすりガラスのぼかし対策（試し）：上端・下端に無地の帯を置く。画面の端に固定の無地があると、iOS がぼかしの代わりにその色を使うことがある */
+#edge-top,#edge-bottom{position:fixed;left:0;right:0;z-index:15;pointer-events:none;background:var(--paper)}
+#edge-top{top:0;height:calc(env(safe-area-inset-top,0px) + 1px)}
+#edge-bottom{bottom:0;height:calc(env(safe-area-inset-bottom,0px) + 1px)}
+body.in-editor #edge-bottom{background:var(--bar)}
+body.kb.in-editor #edge-bottom{display:none}

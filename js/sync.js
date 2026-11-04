@@ -6,9 +6,9 @@
 //  ・ログインしていなければ何もしない（端末の中だけで使える）
 // 原稿の同期用の項目： doc.path（Dropbox 上のパス）, doc.rev, doc.dirty（未送信の変更あり）
 // 作品フォルダの項目： folder.synced（Dropbox にフォルダを作った）, folder.castRev, folder.castDirty
-import * as dbx from './dropbox.js?v=13';
-import * as db from './db.js?v=13';
-import { parseDoc, docStats, setTitle } from './textfile.js?v=13';
+import * as dbx from './dropbox.js?v=14';
+import * as db from './db.js?v=14';
+import { parseDoc, docStats, setTitle } from './textfile.js?v=14';
 
 let S = null;
 const listeners = [];
@@ -45,7 +45,7 @@ export function partners(d) {
   return S.docs.filter(x => x !== d && x.folder === d.folder && (x.name.match(COPY) || [])[1] === d.name);
 }
 export function docState(d) {
-  if (!dbx.signedIn()) return null;
+  if (!dbx.signedIn() || d.sample) return null; // 手つかずのサンプルは同期しないので印も出さない
   if (partners(d).length) return 'conflict';
   return d.dirty || !d.rev ? 'pending' : 'synced';
 }
@@ -102,17 +102,19 @@ async function pushAll() {
     try { await dbx.rpc('files/delete_v2', { path: p }); } catch (e) { if (!e.notFound) throw e; }
     dels = dels.filter(x => x !== p); await db.setMeta('dbxDeletes', dels);
   }
-  // 2. 作品フォルダとキャラ表
+  // 2. 作品フォルダとキャラ表（手つかずのサンプルしか入っていないフォルダは送らない）
   for (const f of S.folders) {
+    if (onlySample(f)) continue;
     if (!f.synced) {
       try { await dbx.rpc('files/create_folder_v2', { path: '/' + f.name, autorename: false }); } catch (e) { if (!e.conflict) throw e; }
       f.synced = true; await db.put('folders', f);
     }
     if (f.castDirty || !f.castRev) await pushCast(f);
   }
-  // 3. 原稿
-  for (const d of [...S.docs]) if (d.dirty || !d.rev || (d.path && lower(d.path) !== lower(docPath(d)))) await pushDoc(d);
+  // 3. 原稿（手つかずのサンプルは送らない。端末ごとに作られるので、送ると端末の数だけ衝突する）
+  for (const d of [...S.docs]) if (!d.sample && (d.dirty || !d.rev || (d.path && lower(d.path) !== lower(docPath(d))))) await pushDoc(d);
 }
+const onlySample = f => { const ds = S.docs.filter(d => d.folder === f.name); return ds.length > 0 && ds.every(d => d.sample); };
 
 const castJson = f => JSON.stringify({ version: 1, regulars: f.cast.map(c => ({ id: c.id, name: c.name, color: c.color, aliases: c.aliases || [] })) }, null, 2) + '\n';
 function readCast(text) { try { const j = JSON.parse(text); return Array.isArray(j.regulars) ? j.regulars : []; } catch (e) { return []; } }
@@ -224,6 +226,11 @@ async function applyEntry(e) {
     const f = await ensureFolder(fname);
     const d = { id: genId(), folder: f.name, name, text, rev: meta.rev, path: meta.path_display, dirty: false, updated: Date.parse(e.server_modified) || Date.now(), stats: statsOf(text, f) };
     S.docs.push(d); await db.put('docs', d); emit({ added: d });
+    return;
+  }
+  if (local.sample) { // 手つかずのサンプル：衝突にせず、黙って Dropbox の版を使う
+    local.sample = false; local.dirty = false; local.text = text; local.rev = meta.rev; local.path = meta.path_display; local.updated = Date.parse(e.server_modified) || Date.now(); local.stats = statsOf(text, folderOf(local.folder));
+    await db.put('docs', local); emit({ replaced: local });
     return;
   }
   if (!local.dirty && local.rev) {
