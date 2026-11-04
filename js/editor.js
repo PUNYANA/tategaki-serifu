@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=30';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=30';
-import * as db from './db.js?v=30';
-import * as sync from './sync.js?v=30';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=31';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=31';
+import * as db from './db.js?v=31';
+import * as sync from './sync.js?v=31';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -564,8 +564,10 @@ cv.addEventListener('scroll', () => {
   if (!active) return;
   if (coasting) { clearTimeout(coastT); coastT = setTimeout(() => { coasting = false; }, 150); } // 惰性が続いている
   const sl = cv.scrollLeft;
-  if (DBG) dlog(`scr ${Math.round(sl)} last=${Math.round(lastSl)} hold=${hold && Date.now() < hold.until ? Math.round(hold.v) : '-'} u=${userScrolling() ? 1 : 0}${fingerDown ? 'F' : ''}${fingerMoved ? 'M' : ''}${coasting ? 'C' : ''} ed=${editing ? 1 : 0} act=${document.activeElement && document.activeElement.className || document.activeElement && document.activeElement.tagName}`);
-  if (editing && lock) {
+  if (DBG) dlog(`scr ${Math.round(sl)} last=${Math.round(lastSl)} want=${g && g.want != null ? Math.round(g.want) : '-'} hold=${hold && Date.now() < hold.until ? Math.round(hold.v) : '-'} u=${userScrolling() ? 1 : 0}${fingerDown ? 'F' : ''}${fingerMoved ? 'M' : ''}${coasting ? 'C' : ''} ed=${editing ? 1 : 0} act=${document.activeElement && document.activeElement.className || document.activeElement && document.activeElement.tagName}`);
+  if (g && (g.kind === 'drag' || g.kind === 'pick')) {
+    if (Math.abs(sl - g.want) > 2) { cv.scrollLeft = g.want; return; } // 移動・選択の間は、いるべき位置から動かさない
+  } else if (editing && lock) {
     if (userScrolling()) lock.dx = editDx();   // 人が動かした → その位置を新しい固定位置に
     else if (Math.abs(editDx() - lock.dx) > 1) {
       // 勝手に動いた → 戻す。ただし短い間に何度も戻す羽目になったら（iOS と引っ張り合って震える）、戻すのをやめて今の位置を受け入れる
@@ -585,7 +587,14 @@ cv.addEventListener('scroll', () => {
 /* ---- 指の操作 ---- */
 let g = null;
 const pt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest ? el : null; };
-function autoScroll(x, y) { if (Math.hypot(x - g.x0, y - g.y0) < 30) return; const rc = cv.getBoundingClientRect(); if (x < rc.left + 32) setSL(getSL() - 14); else if (x > rc.right - 32) setSL(getSL() + 14); }
+// 移動・選択の間は、iOS が横の位置を勝手に 0（先頭）へ書き換えることがある（読むと 0 になる）。
+// そこで位置は読み直さず、押した時の位置にアプリが動かした分だけを足した「いるべき位置」（g.want）を持っておく
+const clampSL = v => Math.max(-(cv.scrollWidth - cv.clientWidth), Math.min(0, v));
+function autoScroll(x, y) {
+  if (Math.hypot(x - g.x0, y - g.y0) < 30) return; const rc = cv.getBoundingClientRect();
+  const d = x < rc.left + 32 ? -14 : x > rc.right - 32 ? 14 : 0; if (!d) return;
+  g.want = clampSL(g.want + d); setSL(g.want);
+}
 // マウスのホイール（縦回し）でも横にスクロールする
 cv.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { setSL(getSL() - e.deltaY); e.preventDefault(); } }, { passive: false });
 cv.addEventListener('pointerdown', e => {
@@ -595,8 +604,8 @@ cv.addEventListener('pointerdown', e => {
   if (s) { g = { kind: 'tapslot', at: s.classList.contains('newcol') ? st.items.length : +s.dataset.at, x: e.clientX, y: e.clientY, sl: getSL() }; return; }
   const el = e.target.closest('[data-i]'); if (!el) return;
   const i = +el.dataset.i; const id = st.items[i].id;
-  if (e.target.closest('.pick')) { e.preventDefault(); if (editing) finishEdit(); const on = !sel.has(id); g = { kind: 'pick', from: i, on, base: new Set(sel), x0: e.clientX, y0: e.clientY }; applyPick(i); return; }
-  if (e.target.closest('.grip')) { e.preventDefault(); if (editing) finishEdit(); const ids = sel.has(id) ? new Set(sel) : new Set([id]); g = { kind: 'drag', ids, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, started: false }; return; }
+  if (e.target.closest('.pick')) { e.preventDefault(); if (editing) finishEdit(); const on = !sel.has(id); g = { kind: 'pick', from: i, on, base: new Set(sel), x0: e.clientX, y0: e.clientY, want: lastSl }; applyPick(i); return; }
+  if (e.target.closest('.grip')) { e.preventDefault(); if (editing) finishEdit(); const ids = sel.has(id) ? new Set(sel) : new Set([id]); g = { kind: 'drag', ids, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, started: false, want: lastSl }; return; }
   if (e.target.closest('.who') && st.items[i].type === 'line') {
     // 書いている枠の名前を押したときは、入力欄からフォーカスを外さない（キーボードを閉じない）
     if (editing && editing.id === id) e.preventDefault();
@@ -648,19 +657,21 @@ function end(cancel) {
     if (it.type === 'line') startEdit(it.id); else if (editing) finishEdit(); return;
   }
   if (p.kind === 'tapslot') { if (!cancel) newAt(p.at); return; }
-  if (p.kind === 'pick') { afterGesture(); return; }
+  if (p.kind === 'pick') { afterGesture(); restorePos(p.want); return; }
   const gh = $('ghost'); gh && gh.remove(); clearDrop();
   afterGesture();
-  if (!p.started || cancel || !p.drop) { render(); holdPos(); return; }
+  if (!p.started || cancel || !p.drop) { render(); restorePos(p.want); return; }
   if (p.drop.kind === 'swap') { if (swapIds(p.ids, p.drop.id)) toast('入れ替えました'); }
   else { moveTo(p.ids, p.drop.at); toast('移動しました'); }
-  render(); holdPos();
+  render(); restorePos(p.want);
 }
 /* つまみでの移動・丸でなぞる選択で指を離したあと：
    描き直しで指の下のつまみが消えると、iOS は指を離した所（すき間の「＋」など）をタップしたことにして、
    そこへフォーカスを移すときに縦書きを間違えて先頭へ飛ばす。そのタップを止め、1.5秒は位置を保つ */
 let gestureEnd = 0;
 function afterGesture() { gestureEnd = Date.now(); }
+// 描き直したあと、いるべき位置へ戻す（iOS が書き換えた 0 を使わない）。次の描画でももう一度
+function restorePos(v) { setSL(v); hold = { v, until: Date.now() + 1500 }; lastSl = v; requestAnimationFrame(() => { if (Math.abs(cv.scrollLeft - v) > 2) setSL(v); }); dlog(`restore ${Math.round(v)} → ${Math.round(cv.scrollLeft)}`); }
 function holdPos() { hold = { v: cv.scrollLeft, until: Date.now() + 1500 }; lastSl = cv.scrollLeft; }
 const justGestured = () => Date.now() - gestureEnd < 500;
 cv.addEventListener('touchend', e => { dlog(`touchend jg=${justGestured() ? 1 : 0} can=${e.cancelable ? 1 : 0} sl=${Math.round(cv.scrollLeft)}`); if (justGestured() && e.cancelable) e.preventDefault(); }, { passive: false });
