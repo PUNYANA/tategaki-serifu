@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=14';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=14';
-import * as db from './db.js?v=14';
-import * as sync from './sync.js?v=14';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=15';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=15';
+import * as db from './db.js?v=15';
+import * as sync from './sync.js?v=15';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -133,10 +133,14 @@ function render() {
   }
   renderBar();
 }
+// 書いているかどうかを body の印にする（キーボード表示中の「完了」ボタンを出すため）
+const markEditing = () => document.body.classList.toggle('editing', !!editing);
+$('kbdone').addEventListener('pointerdown', e => e.preventDefault()); // 押しても入力欄からフォーカスを外さない
+$('kbdone').addEventListener('click', () => finishEdit());
 function paintSel() { cv.querySelectorAll('[data-i]').forEach(el => el.classList.toggle('sel', sel.has(st.items[+el.dataset.i].id))); renderBar(); }
 // 下のボタン列。話者は枠の上の名前をタップしてつける（下に話者の列は置かない）
 function renderBar() {
-  const bar = $('bar'); bar.innerHTML = '';
+  const bar = $('bar'); bar.innerHTML = ''; markEditing();
   if (editing) {
     const els = [spacer(), btn('次のセリフへ', nextSerifu, 'pri'), btn('完了', finishEdit)];
     els.forEach(b => b.addEventListener('pointerdown', e => e.preventDefault()));

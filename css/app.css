@@ -204,3 +204,8 @@ body.kb.in-editor #canvas{padding-bottom:8px}
 #edge-bottom{bottom:0;height:calc(env(safe-area-inset-bottom,0px) + 1px)}
 body.in-editor #edge-bottom{background:var(--bar)}
 body.kb.in-editor #edge-bottom{display:none}
+/* キーボードが出ている間の「完了」（右下に小さく。iPad のキーボードには ✓ がない） */
+#kbdone{display:none;position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:10px;z-index:6;min-height:40px;padding:6px 16px;
+  background:var(--accent);color:var(--accent-fg);border-color:var(--accent);border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+body.kb.in-editor.editing #kbdone{display:block}
+#editview{position:relative}
