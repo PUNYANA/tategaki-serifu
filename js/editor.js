@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=26';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=26';
-import * as db from './db.js?v=26';
-import * as sync from './sync.js?v=26';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=27';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=27';
+import * as db from './db.js?v=27';
+import * as sync from './sync.js?v=27';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -98,7 +98,7 @@ function chipBtn(c, on, fn) { const b = btn(c.name, fn, 'chip' + (on ? ' on' : '
 /* ---- 横スクロールの位置 ----
    縦書きなので scrollLeft は 0＝書き出し（右端）で、左へ進むほど負になる */
 const getSL = () => cv.scrollLeft;
-const setSL = v => { cv.scrollLeft = v; };
+const setSL = v => { cv.scrollLeft = v; lastSl = cv.scrollLeft; }; // アプリが動かした位置は、正しい位置として覚える
 
 /* ---- 描画 ---- */
 const leadPage = () => st.items.length && st.items[0].type !== 'div' ? 1 : 0;
@@ -539,7 +539,8 @@ let reverts = [];                          // 直近で「戻した」時刻（i
 function allowJumpFor(ms) { userUntil = Math.max(userUntil, Date.now() + ms); }
 const userScrolling = () => (fingerDown && fingerMoved) || coasting || mouseDown || Date.now() < userUntil;
 cv.addEventListener('touchstart', () => { fingerDown = true; fingerMoved = false; coasting = false; }, { passive: true });
-cv.addEventListener('touchmove', () => { if (fingerDown) fingerMoved = true; }, { passive: true });
+// つまみでの移動・丸でなぞる選択の間は、指が動いても原稿はスクロールしないので「人のスクロール」にしない
+cv.addEventListener('touchmove', () => { if (fingerDown && !(g && (g.kind === 'drag' || g.kind === 'pick'))) fingerMoved = true; }, { passive: true });
 const fingerUp = () => {
   // 指でスクロールしていたなら、惰性が止まるまでは人の操作として扱う（時間では区切らない）
   if (fingerMoved) { coasting = true; clearTimeout(coastT); coastT = setTimeout(() => { coasting = false; }, 150); }
@@ -564,7 +565,7 @@ cv.addEventListener('scroll', () => {
     }
   } else if (hold && Date.now() < hold.until && !userScrolling() && Math.abs(sl - hold.v) > 2) {
     cv.scrollLeft = hold.v; return; // 書き終えた直後の勝手な移動は戻す
-  } else if (!userScrolling() && Math.abs(sl - lastSl) > Math.max(400, cv.clientWidth * 0.9)) {
+  } else if (!userScrolling() && Math.abs(sl - lastSl) > 2) { // 人もアプリも動かしていないのに動いた → どれだけ小さくても戻す
     cv.scrollLeft = lastSl; return;
   }
   lastSl = sl;
