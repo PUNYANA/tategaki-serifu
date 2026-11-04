@@ -1,11 +1,11 @@
 // 起動と、一覧⇔編集の切り替え
-import { $, toast } from './ui.js?v=18';
-import * as db from './db.js?v=18';
-import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=18';
-import { initList, renderList, newDoc } from './list.js?v=18';
-import * as sync from './sync.js?v=18';
-import { finishSignIn } from './dropbox.js?v=18';
-import { setTitle } from './textfile.js?v=18';
+import { $, toast } from './ui.js?v=19';
+import * as db from './db.js?v=19';
+import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=19';
+import { initList, renderList, newDoc } from './list.js?v=19';
+import * as sync from './sync.js?v=19';
+import { finishSignIn } from './dropbox.js?v=19';
+import { setTitle } from './textfile.js?v=19';
 
 const state = { folders: [], docs: [] };
 
@@ -59,7 +59,25 @@ if (vv) {
   vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); fit();
 }
 
+// 公開版の更新に気づいて読み直す。GitHub Pages は最初のページを10分ほど端末に覚えさせるので、
+// 開き直しても古い版が出ることがある。起動時と画面に戻ったときに最新の版番号を確かめ、違えば読み直す
+export const APP_V = new URL(import.meta.url).searchParams.get('v') || '';
+async function checkUpdate() {
+  if (new URL(location.href).searchParams.has('code')) return; // Dropbox のログインから戻ってきたところでは読み直さない
+  try {
+    const r = await fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' });
+    const m = (await r.text()).match(/js\/main\.js\?v=(\d+)/);
+    if (!m || m[1] === APP_V) return;
+    if (sessionStorage.getItem('tategaki-upd') === m[1]) return; // 読み直しても変わらないときに、繰り返さない
+    sessionStorage.setItem('tategaki-upd', m[1]);
+    flushSave();
+    location.replace(location.pathname + '?v=' + m[1]); // アドレスを変えて、覚えている古いページを使わせない
+  } catch (e) { /* オフラインなど：今の版のまま使う */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
+
 async function boot() {
+  checkUpdate();
   // 端末の空き容量が減ったときにブラウザが勝手に消さないよう頼んでおく
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
   // 前回 IndexedDB に入らずに退避した分を戻す

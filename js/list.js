@@ -1,8 +1,8 @@
 // 原稿一覧：作品フォルダごとに原稿を並べる（更新順）
-import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=18';
-import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=18';
-import * as db from './db.js?v=18';
-import * as sync from './sync.js?v=18';
+import { $, esc, btn, toast, closeLayer, bgClose } from './ui.js?v=19';
+import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=19';
+import * as db from './db.js?v=19';
+import * as sync from './sync.js?v=19';
 
 let S = null, onOpen = null;
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -166,7 +166,7 @@ function dbxSheet() {
       <p>ログアウトしても、この端末の原稿は消えません。</p>`;
   }
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="Dropbox"><h2>Dropbox</h2>${body}
-    <div class="row"><span class="sp"></span><button type="button" id="dx-close">閉じる</button></div></div></div>`;
+    <div class="row"><span class="ver">アプリの版：${esc(new URL(import.meta.url).searchParams.get('v') || '—')}</span><span class="sp"></span><button type="button" id="dx-close">閉じる</button></div></div></div>`;
   const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
   on('dx-in', async () => { try { await sync.signIn(); } catch (e) { toast(e.message); } });
   on('dx-now', async () => { closeLayer(); await sync.sync(); renderList(); toast(sync.status === 'idle' ? '同期しました' : '同期できませんでした'); });
