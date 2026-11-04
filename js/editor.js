@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer } from './ui.js?v=20';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=20';
-import * as db from './db.js?v=20';
-import * as sync from './sync.js?v=20';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=21';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=21';
+import * as db from './db.js?v=21';
+import * as sync from './sync.js?v=21';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -319,7 +319,7 @@ function openCast() {
       <h2>キャラ表</h2><p>色の丸を押すと色が変わります。消したキャラのセリフは話者なしに戻ります。</p>
       <section><h3>レギュラー（この作品の全部の原稿）</h3>
         <div id="cl" class="cast-list"></div>
-        <div class="row"><button type="button" id="cl-add">＋ レギュラーを追加</button></div></section>
+        <p>レギュラーを足すときは、一覧のフォルダの「…」→「キャラ表」から。</p></section>
       <section><h3>この回のゲスト（この原稿だけ）</h3>
         <div id="gl" class="cast-list"></div></section>
       <div class="row"><span class="sp"></span><button type="button" class="pri" id="cl-close">閉じる</button></div></div></div>`;
@@ -328,7 +328,6 @@ function openCast() {
     st.guests.forEach(c => row(c, st.guests, gl));
     if (!st.cast.length) cl.innerHTML = '<p>まだレギュラーがいません。</p>';
     if (!st.guests.length) gl.innerHTML = '<p>ゲストはいません。セリフの枠の上の名前をタップして「＋ ゲスト」から足せます。</p>';
-    $('cl-add').onclick = () => { const id = 'c' + Date.now().toString(36); st.cast.push({ id, name: '', color: pickColor([...st.cast, ...st.guests].map(c => c.color)), aliases: [] }); draw(); const el = $('cn-' + id); el && el.focus(); };
     $('cl-close').onclick = close; bgClose(close);
   };
   draw();
@@ -361,8 +360,10 @@ function openMenu() {
       <textarea id="i-ta" name="import-text" autocomplete="off" placeholder="ここに貼り付け。セリフは空行で区切る。「名前：」で始まると話者がつく。「---」はページの区切り。" aria-label="読み込むテキスト"></textarea>
       <div class="row"><button type="button" id="i-add">最後に足す</button><button type="button" id="i-rep" class="danger">全部置き換え</button></div></section>
     <section><h3>設定</h3>
+      <div class="row"><span class="lbl-t">色</span><span id="mn-theme"></span></div>
       <div class="row"><button type="button" id="mn-sample" class="danger">サンプルに戻す</button><span class="sp"></span><button type="button" class="pri" id="mn-close">閉じる</button></div></section>
   </div></div>`;
+  themeButtons($('mn-theme'));
   const ta = $('o-ta');
   const draw = () => { ta.value = exportText(outMode === 'name', scoped()); $('o-name').className = outMode === 'name' ? 'on' : ''; $('o-raw').className = outMode === 'raw' ? 'on' : ''; };
   $('o-name').onclick = () => { outMode = 'name'; draw(); }; $('o-raw').onclick = () => { outMode = 'raw'; draw(); }; draw();
