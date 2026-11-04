@@ -224,16 +224,22 @@ input[type=search]::-webkit-search-cancel-button,input[type=search]::-webkit-sea
 .cast input[type=search]{flex:1}
 .sheet .ver{font-size:12px;color:var(--muted)}
 
-/* ---- 色のモード：紙（目にやさしい明るい色）と夜（目にやさしい暗い色） ----
-   どちらも真っ白・真っ黒を避け、文字と背景の差を少しだけ和らげている。選んだ印の青も暖かい色に寄せる */
+/* ---- 色のモード：紙（生成り）・緑・青（どれも目にやさしい明るい色） ----
+   真っ白を避け、文字と背景の差を少しだけ和らげている。選んだ印の色もそれぞれの色に寄せる */
 :root[data-theme="paper"]{
   --paper:#f3ead6; --sheet:#faf4e6; --ink:#3d342b; --muted:#857865; --rule:#dfd2b9;
   --sel:#eadcbd; --sel-edge:#a0763f; --pin:#f2d9c9; --pin-edge:#b0583a; --warn:#b0583a;
   --bar:#ece1c9; --btn:#faf4e6; --btn-fg:#3d342b; --accent:#8a5a2b; --accent-fg:#fffaf0; color-scheme:light}
-:root[data-theme="night"]{
-  --paper:#1f1c18; --sheet:#27231e; --ink:#d9cfbf; --muted:#9a8e7d; --rule:#3a342c;
-  --sel:#3a3226; --sel-edge:#c9a56a; --pin:#45302a; --pin-edge:#d98b6f; --warn:#d98b6f;
-  --bar:#1a1814; --btn:#2c2721; --btn-fg:#d9cfbf; --accent:#c9a56a; --accent-fg:#1f1c18; color-scheme:dark}
+:root[data-theme="green"]{
+  --paper:#e5eddd; --sheet:#f3f7ee; --ink:#2b382d; --muted:#6c7c6c; --rule:#cddac4;
+  --sel:#d2e3c4; --sel-edge:#5a8a4e; --pin:#f2ddd3; --pin-edge:#b0583a; --warn:#b0583a;
+  --bar:#dce7d2; --btn:#f3f7ee; --btn-fg:#2b382d; --accent:#3e6a39; --accent-fg:#f8fbf4; color-scheme:light}
+:root[data-theme="blue"]{
+  --paper:#e2eaf2; --sheet:#f2f6fa; --ink:#26313e; --muted:#6a7788; --rule:#cad6e2;
+  --sel:#cee0ee; --sel-edge:#4a7fae; --pin:#f2dcd6; --pin-edge:#b0583a; --warn:#b0583a;
+  --bar:#d8e3ed; --btn:#f2f6fa; --btn-fg:#26313e; --accent:#2e5e89; --accent-fg:#f6f9fc; color-scheme:light}
+/* 画面には出さないが、読み上げ用に残す */
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .theme-seg{flex-wrap:wrap}
 .theme-seg button{min-width:3.6em}
 .sheet .lbl-t{font-size:13px;color:var(--muted);min-width:2em}

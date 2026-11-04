@@ -9,21 +9,21 @@
 <meta name="apple-mobile-web-app-title" content="セリフ帳">
 <meta name="theme-color" content="#f6f7f5" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#15181e" media="(prefers-color-scheme: dark)">
-<script>try{var t=localStorage.getItem('tategaki-theme');if(t&&t!=='auto')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<script>try{var t=localStorage.getItem('tategaki-theme');if(t==='night')t='dark';if(t&&t!=='auto')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
-<link rel="stylesheet" href="css/app.css?v=33">
-<script type="module" src="js/main.js?v=33"></script>
+<link rel="stylesheet" href="css/app.css?v=34">
+<script type="module" src="js/main.js?v=34"></script>
 </head>
 <body>
 <!-- iOS の「連絡先を自動入力」を抑えるため、入力欄を自動入力オフのフォームに入れる（送信はしない） -->
 <form id="root" autocomplete="off" novalidate onsubmit="return false">
 <div id="app">
   <header>
-    <h1 id="title">縦書きセリフ帳</h1>
+    <h1 id="title" class="vh">縦書きセリフ帳</h1>
     <span id="hdr"></span>
   </header>
   <main id="listview" hidden></main>

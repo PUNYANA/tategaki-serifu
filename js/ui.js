@@ -15,10 +15,14 @@ export function bgClose(fn) {
 }
 
 /* ---- 色のモード（端末ごとに覚える） ----
-   auto：端末の設定に合わせる（ライト／ダーク）。paper（紙）と night（夜）は目にやさしい暖かい色 */
-export const THEMES = [['auto', '自動'], ['light', 'ライト'], ['dark', 'ダーク'], ['paper', '紙'], ['night', '夜']];
-const THEME_BAR = { light: '#f6f7f5', dark: '#15181e', paper: '#f3ead6', night: '#1f1c18' };
-export function getTheme() { try { return localStorage.getItem('tategaki-theme') || 'auto'; } catch (e) { return 'auto'; } }
+   auto：端末の設定に合わせる（ライト／ダーク）。paper（紙）・green（緑）・blue（青）は目にやさしい明るい色。前の版の night（夜）はダークとほぼ同じだったのでなくし、ダークとして扱う */
+export const THEMES = [['auto', '自動'], ['light', 'ライト'], ['dark', 'ダーク'], ['paper', '紙'], ['green', '緑'], ['blue', '青']];
+const THEME_BAR = { light: '#f6f7f5', dark: '#15181e', paper: '#f3ead6', green: '#e5eddd', blue: '#e2eaf2' };
+export function getTheme() {
+  let t = 'auto'; try { t = localStorage.getItem('tategaki-theme') || 'auto'; } catch (e) { }
+  if (t === 'night') t = 'dark';
+  return THEMES.some(([k]) => k === t) ? t : 'auto';
+}
 export function applyTheme(t) {
   const root = document.documentElement;
   if (t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);

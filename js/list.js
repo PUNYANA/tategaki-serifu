@@ -1,8 +1,8 @@
 // 原稿一覧：作品フォルダごとに原稿を並べる（更新順）
-import { $, esc, btn, toast, closeLayer, bgClose, themeButtons } from './ui.js?v=33';
-import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=33';
-import * as db from './db.js?v=33';
-import * as sync from './sync.js?v=33';
+import { $, esc, btn, toast, closeLayer, bgClose, themeButtons } from './ui.js?v=34';
+import { serializeDoc, docStats, setTitle, COLORS, pickColor } from './textfile.js?v=34';
+import * as db from './db.js?v=34';
+import * as sync from './sync.js?v=34';
 
 let S = null, onOpen = null;
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -256,7 +256,7 @@ function castSheet(f) {
 function themeSheet() {
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="表示"><h2>表示</h2>
     <section><h3>色</h3><div id="th"></div>
-      <p>「紙」と「夜」は目にやさしい色です。紙＝生成りの紙のような明るい色、夜＝暖かみのある暗い色で、まぶしさを抑えています。「自動」は端末のライト／ダークの設定に合わせます。この端末だけに覚えます。</p></section>
+      <p>「紙」「緑」「青」は目にやさしい明るい色です。紙＝生成りの紙のような色、緑・青＝淡くくすませた色で、まぶしさを抑えています。「自動」は端末のライト／ダークの設定に合わせます。この端末だけに覚えます。</p></section>
     <div class="row"><span class="sp"></span><button type="button" class="pri" id="th-close">閉じる</button></div></div></div>`;
   themeButtons($('th'));
   $('th-close').onclick = closeLayer; bgClose(closeLayer);
