@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=42';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=42';
-import * as db from './db.js?v=42';
-import * as sync from './sync.js?v=42';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=43';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=43';
+import * as db from './db.js?v=43';
+import * as sync from './sync.js?v=43';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -444,11 +444,20 @@ function openMenu() {
     commit(() => scoped().forEach(i => { if (i.type !== 'line') return; const t = punct(i.text, o); if (t !== i.text) { i.text = t; n++; } })); draw(); render(); toast(n + '件を変換しました');
   };
   $('i-add').onclick = () => { const v = $('i-ta').value; if (!v.trim()) return; commit(() => { st.items.push(...importText(v)); }); closeLayer(); render(); scrollToI(st.items.length - 1); toast('足しました'); };
-  // 入れ替えは今のセリフが全部消えるので、一度確かめてから
-  const askRep = on => { $('i-ask').hidden = !on; $('i-add').parentElement.hidden = on; };
-  $('i-rep').onclick = () => { if (!$('i-ta').value.trim()) { toast('先に上の欄へ貼り付けてください'); return; } askRep(true); };
+  // 入れ替えは今のセリフが全部消えるので、一度確かめてから。欄が空なら「全部消す」として使える
+  const askRep = on => {
+    const empty = !$('i-ta').value.trim();
+    $('i-ask').firstElementChild.textContent = empty ? '今のノートのセリフを全部消しますか？' : '今のノートのセリフを全部消して、貼り付けた文章に入れ替えますか？';
+    $('i-yes').textContent = empty ? '全部消す' : '入れ替える';
+    $('i-ask').hidden = !on; $('i-add').parentElement.hidden = on;
+  };
+  $('i-rep').onclick = () => askRep(true);
   $('i-no').onclick = () => askRep(false);
-  $('i-yes').onclick = () => { const v = $('i-ta').value; if (!v.trim()) { askRep(false); return; } commit(() => { st.items = importText(v); }); sel.clear(); closeLayer(); render(); toast('入れ替えました（元に戻せます）'); };
+  $('i-yes').onclick = () => {
+    const v = $('i-ta').value, empty = !v.trim();
+    commit(() => { st.items = empty ? [] : importText(v); }); sel.clear(); closeLayer(); render();
+    toast(empty ? '全部消しました（元に戻せます）' : '入れ替えました（元に戻せます）');
+  };
   $('mn-close').onclick = () => { closeLayer(); render(); };
   bgClose(() => { closeLayer(); render(); });
 }
