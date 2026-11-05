@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=41';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=41';
-import * as db from './db.js?v=41';
-import * as sync from './sync.js?v=41';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=42';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=42';
+import * as db from './db.js?v=42';
+import * as sync from './sync.js?v=42';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -391,7 +391,7 @@ function exportText(withName, items, pages) {
 }
 const importText = t => parseBody(t, st.cast, st.guests).map(mk); // 知らない名前はこの回のゲストになる
 // 「、、」「、、、」→「…」は「、」をスペースにするより先にやる（先にスペースになると拾えない）
-function punct(t, o) { if (o.dots) t = t.replace(/[、､]{2,}/g, '…'); if (o.maru) t = t.replace(/[。｡]/g, ''); if (o.ten) t = t.replace(/[、､]/g, o.half ? ' ' : '　'); return t.replace(/[ 　]+$/gm, ''); }
+function punct(t, o) { if (o.dots) t = t.replace(/[、､]{2,}|[。｡]{2,}/g, '…'); if (o.maru) t = t.replace(/[。｡]/g, ''); if (o.ten) t = t.replace(/[、､]/g, o.half ? ' ' : '　'); return t.replace(/[ 　]+$/gm, ''); }
 function openMenu() {
   if (editing) finishEdit();
   const scopeSel = sel.size > 0;
@@ -415,14 +415,15 @@ function openMenu() {
       <textarea id="o-ta" readonly aria-label="書き出し結果"></textarea>
       <div class="row"><button type="button" class="pri" id="o-copy">コピー</button></div></section>
     <section><h3>句読点の一括変換</h3>
+      <label class="ck"><input type="checkbox" id="p-dots" checked>「、、」「、、、」「。。」「。。。」を「…」にする</label>
       <label class="ck"><input type="checkbox" id="p-maru" checked>「。」を消す</label>
-      <label class="ck"><input type="checkbox" id="p-dots" checked>「、、」「、、、」を「…」にする</label>
       <label class="ck"><input type="checkbox" id="p-ten" checked>「、」をスペースにする</label>
       <label class="ck"><input type="checkbox" id="p-half">スペースを半角にする（ふだんは全角）</label>
       <div class="row"><button type="button" id="p-go">変換する</button></div><p>行末に残ったスペースは消します。元に戻せます。</p></section>
     <section><h3>テキストを貼って取り込む</h3>
       <textarea id="i-ta" name="import-text" autocomplete="off" placeholder="ここに貼り付け。セリフは空行で区切る。「先輩：」のように書き出すと話者がつく。「---」はページの区切り。" aria-label="読み込むテキスト"></textarea>
-      <div class="row"><button type="button" id="i-add">今のノートの後ろに足す</button><button type="button" id="i-rep" class="danger">今のノートを消して入れ替える</button></div></section>
+      <div class="row"><button type="button" id="i-add">今のノートの後ろに足す</button><button type="button" id="i-rep" class="danger">今のノートを消して入れ替える</button></div>
+      <div class="row" id="i-ask" hidden><span>今のノートのセリフを全部消して、貼り付けた文章に入れ替えますか？</span><span class="sp"></span><button type="button" id="i-no">やめる</button><button type="button" id="i-yes" class="danger">入れ替える</button></div></section>
     <section><h3>設定</h3>
       <div class="row"><span class="lbl-t">色</span><span id="mn-theme"></span></div>
       <div class="row"><span class="sp"></span><button type="button" class="pri" id="mn-close">閉じる</button></div></section>
@@ -443,7 +444,11 @@ function openMenu() {
     commit(() => scoped().forEach(i => { if (i.type !== 'line') return; const t = punct(i.text, o); if (t !== i.text) { i.text = t; n++; } })); draw(); render(); toast(n + '件を変換しました');
   };
   $('i-add').onclick = () => { const v = $('i-ta').value; if (!v.trim()) return; commit(() => { st.items.push(...importText(v)); }); closeLayer(); render(); scrollToI(st.items.length - 1); toast('足しました'); };
-  $('i-rep').onclick = () => { const v = $('i-ta').value; if (!v.trim()) return; commit(() => { st.items = importText(v); }); sel.clear(); closeLayer(); render(); toast('入れ替えました（元に戻せます）'); };
+  // 入れ替えは今のセリフが全部消えるので、一度確かめてから
+  const askRep = on => { $('i-ask').hidden = !on; $('i-add').parentElement.hidden = on; };
+  $('i-rep').onclick = () => { if (!$('i-ta').value.trim()) { toast('先に上の欄へ貼り付けてください'); return; } askRep(true); };
+  $('i-no').onclick = () => askRep(false);
+  $('i-yes').onclick = () => { const v = $('i-ta').value; if (!v.trim()) { askRep(false); return; } commit(() => { st.items = importText(v); }); sel.clear(); closeLayer(); render(); toast('入れ替えました（元に戻せます）'); };
   $('mn-close').onclick = () => { closeLayer(); render(); };
   bgClose(() => { closeLayer(); render(); });
 }
