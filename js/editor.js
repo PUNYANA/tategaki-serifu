@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=43';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=43';
-import * as db from './db.js?v=43';
-import * as sync from './sync.js?v=43';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=45';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=45';
+import * as db from './db.js?v=45';
+import * as sync from './sync.js?v=45';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -193,7 +193,8 @@ function renderBar() {
     bar.append(...els); return;
   }
   if (sel.size) {
-    bar.append(btn('話者なし', () => { commit(() => st.items.forEach(i => { if (sel.has(i.id)) i.who = null; })); render(); }), btn('まとめる', doMerge, '', sel.size < 2), btn('削除', doDelete, 'danger'), btn('出力', openMenu), btn('区切り', addDiv), spacer(), btn('解除', () => { sel.clear(); paintSel(); }, 'pri'));
+    // 「キャンセル」は長いので、狭い画面では選択中の列だけボタンの左右の余白を詰めて収める（css の .tight）
+    bar.append(btn('話者なし', () => { commit(() => st.items.forEach(i => { if (sel.has(i.id)) i.who = null; })); render(); }, 'tight'), btn('まとめる', doMerge, 'tight', sel.size < 2), btn('削除', doDelete, 'danger tight'), btn('出力', openMenu, 'tight'), btn('区切り', addDiv, 'tight'), spacer(), btn('キャンセル', () => { sel.clear(); paintSel(); }, 'pri tight'));
     return;
   }
   // 編集画面には上のバーを置かない。一覧へ・元に戻す／やり直しもこの列にまとめる
