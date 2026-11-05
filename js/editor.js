@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=38';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=38';
-import * as db from './db.js?v=38';
-import * as sync from './sync.js?v=38';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=39';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=39';
+import * as db from './db.js?v=39';
+import * as sync from './sync.js?v=39';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -390,7 +390,8 @@ function exportText(withName, items, pages) {
   return items.map((i, k) => { if (i.type === 'div') return '--- P' + pages[k]; const w = who(i.who); return withName && w ? `${w.name}：${i.text}` : i.text; }).join('\n\n');
 }
 const importText = t => parseBody(t, st.cast, st.guests).map(mk); // 知らない名前はこの回のゲストになる
-function punct(t, o) { if (o.maru) t = t.replace(/[。｡]/g, ''); if (o.ten) t = t.replace(/[、､]/g, o.half ? ' ' : '　'); return t.replace(/[ 　]+$/gm, ''); }
+// 「、、」「、、、」→「…」は「、」をスペースにするより先にやる（先にスペースになると拾えない）
+function punct(t, o) { if (o.dots) t = t.replace(/[、､]{2,}/g, '…'); if (o.maru) t = t.replace(/[。｡]/g, ''); if (o.ten) t = t.replace(/[、､]/g, o.half ? ' ' : '　'); return t.replace(/[ 　]+$/gm, ''); }
 function openMenu() {
   if (editing) finishEdit();
   const scopeSel = sel.size > 0;
@@ -415,6 +416,7 @@ function openMenu() {
       <div class="row"><button type="button" class="pri" id="o-copy">コピー</button></div></section>
     <section><h3>句読点の一括変換</h3>
       <label class="ck"><input type="checkbox" id="p-maru" checked>「。」を消す</label>
+      <label class="ck"><input type="checkbox" id="p-dots" checked>「、、」「、、、」を「…」にする</label>
       <label class="ck"><input type="checkbox" id="p-ten" checked>「、」をスペースにする</label>
       <label class="ck"><input type="checkbox" id="p-half">スペースを半角にする（ふだんは全角）</label>
       <div class="row"><button type="button" id="p-go">変換する</button></div><p>行末に残ったスペースは消します。元に戻せます。</p></section>
@@ -437,7 +439,7 @@ function openMenu() {
     navigator.clipboard ? navigator.clipboard.writeText(ta.value).then(ok, ng) : ng();
   };
   $('p-go').onclick = () => {
-    const o = { maru: $('p-maru').checked, ten: $('p-ten').checked, half: $('p-half').checked }; let n = 0;
+    const o = { dots: $('p-dots').checked, maru: $('p-maru').checked, ten: $('p-ten').checked, half: $('p-half').checked }; let n = 0;
     commit(() => scoped().forEach(i => { if (i.type !== 'line') return; const t = punct(i.text, o); if (t !== i.text) { i.text = t; n++; } })); draw(); render(); toast(n + '件を変換しました');
   };
   $('i-add').onclick = () => { const v = $('i-ta').value; if (!v.trim()) return; commit(() => { st.items.push(...importText(v)); }); closeLayer(); render(); scrollToI(st.items.length - 1); toast('足しました'); };
