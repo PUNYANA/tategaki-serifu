@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=37';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=37';
-import * as db from './db.js?v=37';
-import * as sync from './sync.js?v=37';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=38';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=38';
+import * as db from './db.js?v=38';
+import * as sync from './sync.js?v=38';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -418,12 +418,12 @@ function openMenu() {
       <label class="ck"><input type="checkbox" id="p-ten" checked>「、」をスペースにする</label>
       <label class="ck"><input type="checkbox" id="p-half">スペースを半角にする（ふだんは全角）</label>
       <div class="row"><button type="button" id="p-go">変換する</button></div><p>行末に残ったスペースは消します。元に戻せます。</p></section>
-    <section><h3>読み込み</h3>
+    <section><h3>テキストを貼って取り込む</h3>
       <textarea id="i-ta" name="import-text" autocomplete="off" placeholder="ここに貼り付け。セリフは空行で区切る。「先輩：」のように書き出すと話者がつく。「---」はページの区切り。" aria-label="読み込むテキスト"></textarea>
-      <div class="row"><button type="button" id="i-add">最後に足す</button><button type="button" id="i-rep" class="danger">全部置き換え</button></div></section>
+      <div class="row"><button type="button" id="i-add">今のノートの後ろに足す</button><button type="button" id="i-rep" class="danger">今のノートを消して入れ替える</button></div></section>
     <section><h3>設定</h3>
       <div class="row"><span class="lbl-t">色</span><span id="mn-theme"></span></div>
-      <div class="row"><button type="button" id="mn-sample" class="danger">サンプルに戻す</button><span class="sp"></span><button type="button" class="pri" id="mn-close">閉じる</button></div></section>
+      <div class="row"><span class="sp"></span><button type="button" class="pri" id="mn-close">閉じる</button></div></section>
   </div></div>`;
   themeButtons($('mn-theme'));
   const ta = $('o-ta');
@@ -441,16 +441,7 @@ function openMenu() {
     commit(() => scoped().forEach(i => { if (i.type !== 'line') return; const t = punct(i.text, o); if (t !== i.text) { i.text = t; n++; } })); draw(); render(); toast(n + '件を変換しました');
   };
   $('i-add').onclick = () => { const v = $('i-ta').value; if (!v.trim()) return; commit(() => { st.items.push(...importText(v)); }); closeLayer(); render(); scrollToI(st.items.length - 1); toast('足しました'); };
-  $('i-rep').onclick = () => { const v = $('i-ta').value; if (!v.trim()) return; commit(() => { st.items = importText(v); }); sel.clear(); closeLayer(); render(); toast('置き換えました（元に戻せます）'); };
-  // サンプルに戻す：この原稿の中身をサンプルに置き換える。キャラ表は作品で共有なので、足りないキャラだけ足す
-  $('mn-sample').onclick = () => {
-    commit(() => {
-      const map = {};
-      SAMPLE_CAST.forEach(sc => { let c = findCast(st.cast, sc.name); if (!c) { c = { ...sc, id: 'c' + Date.now().toString(36) + st.cast.length, aliases: [] }; st.cast.push(c); } map[sc.id] = c.id; });
-      st.items = SAMPLE.map(o => mk({ ...o, who: o.who ? map[o.who] : null }));
-    });
-    sel.clear(); closeLayer(); render();
-  };
+  $('i-rep').onclick = () => { const v = $('i-ta').value; if (!v.trim()) return; commit(() => { st.items = importText(v); }); sel.clear(); closeLayer(); render(); toast('入れ替えました（元に戻せます）'); };
   $('mn-close').onclick = () => { closeLayer(); render(); };
   bgClose(() => { closeLayer(); render(); });
 }
