@@ -140,7 +140,7 @@ body.kb.in-editor #bar{display:none}
 #root{margin:0}
 .blk{padding-bottom:44px}
 .pick{height:40px}
-#bar button.back{font-size:20px;line-height:1;padding-inline:12px}
+#bar button.back{font-size:20px;line-height:1;padding-inline:12px;margin-right:14px} /* 戻るは押し間違えやすいので隣と少し離す */
 #bar button.ur{padding-inline:12px}
 /* ダブルタップ・ピンチで拡大しない（横スクロール・縦スクロールはそのまま） */
 html,body{touch-action:pan-x pan-y}
@@ -156,6 +156,7 @@ button,.slot,.newcol,.who{touch-action:manipulation}
 @media (max-width:430px){
   #bar{gap:4px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
   #bar button,#bar button.back,#bar button.ur{padding-inline:8px}
+  #bar button.back{margin-right:6px} /* 幅の狭い画面では、ほかのボタンが押し出されない程度に */
   #bar button.ur{min-width:38px}
 }
 /* スマホではタップのあと「＋」が青いまま残る（:hover が残る）ので、押している間だけ青くする */
