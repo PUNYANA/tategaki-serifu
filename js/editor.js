@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=47';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=47';
-import * as db from './db.js?v=47';
-import * as sync from './sync.js?v=47';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=49';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=49';
+import * as db from './db.js?v=49';
+import * as sync from './sync.js?v=49';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -204,8 +204,23 @@ function renderBar() {
 }
 
 /* ---- 操作 ---- */
-function doUndo() { if (!undo.length) return; redo.push(snap()); restore(undo.pop()); sel.clear(); save(); render(); }
-function doRedo() { if (!redo.length) return; undo.push(snap()); restore(redo.pop()); sel.clear(); save(); render(); }
+function doUndo() { if (!undo.length) return; const b = plain().items; redo.push(snap()); restore(undo.pop()); sel.clear(); save(); render(); showChange(b); }
+function doRedo() { if (!redo.length) return; const b = plain().items; undo.push(snap()); restore(redo.pop()); sel.clear(); save(); render(); showChange(b); }
+// 元に戻す・やり直しのあと、変わった所へ移動して少し光らせる。
+// 前後の並びを頭とお尻から見比べて、食い違っている範囲を変わった所とみなす（消えただけのときは、その両隣を光らせる）
+function showChange(before) {
+  const a = plain().items, same = (x, y) => x.type === y.type && x.text === y.text && x.who === y.who;
+  let p = 0; while (p < a.length && p < before.length && same(a[p], before[p])) p++;
+  let s = 0; while (s < a.length - p && s < before.length - p && same(a[a.length - 1 - s], before[before.length - 1 - s])) s++;
+  if (p === a.length && p === before.length) return; // 並びは同じ（キャラ表だけ変わったなど）
+  let from = p, to = a.length - s - 1;
+  if (to < from) { from = Math.max(0, p - 1); to = Math.min(a.length - 1, p); } // 消えただけ
+  if (to < 0) return;
+  // render() のすぐあとなので、ここで直接動かす（画面の書き換えを待たなくてよい）
+  allowJumpFor(1500);
+  const first = cv.querySelector(`[data-i="${from}"]`); if (first) first.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+  for (let i = from; i <= to; i++) { const el = cv.querySelector(`[data-i="${i}"]`); if (el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); } }
+}
 function doMerge() {
   const ix = st.items.map((it, i) => sel.has(it.id) ? i : -1).filter(i => i >= 0); const part = ix.map(i => st.items[i]).filter(i => i.type === 'line');
   if (part.length < 2) { toast('セリフを2つ以上選んでください'); return; }

@@ -277,3 +277,6 @@ body.kb.in-editor.editing .kbmove{display:block}
 .cast .mv{min-height:36px;width:36px;padding:0;flex:none}
 .cast-ask{border:1px solid var(--pin-edge);background:var(--pin);border-radius:10px;padding:10px 12px}
 .cast-ask p{margin:0 0 8px;color:var(--ink)}
+/* 元に戻す・やり直しで変わった所を少し光らせる */
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 3px transparent}}
+#canvas [data-i].flash{animation:flash 1.4s ease-out}
