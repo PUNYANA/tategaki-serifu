@@ -158,8 +158,6 @@ button,.slot,.newcol,.who{touch-action:manipulation}
   #bar button,#bar button.back,#bar button.ur{padding-inline:8px}
   #bar button.back{margin-right:6px} /* 幅の狭い画面では、ほかのボタンが押し出されない程度に */
   #bar button.ur{min-width:38px}
-  #bar:has(button.tight){gap:3px}
-  #bar button.tight{padding-inline:5px}
 }
 /* スマホではタップのあと「＋」が青いまま残る（:hover が残る）ので、押している間だけ青くする */
 @media (hover:none){.slot:hover:not(:active) span{background:transparent;color:inherit;opacity:.55}}
