@@ -198,6 +198,14 @@ header{padding-top:calc(10px + env(safe-area-inset-top,0px))}
 #bar{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 /* 上の線はタップ・なぞりで移動できる */
 #pos{touch-action:none;cursor:pointer;-webkit-user-select:none;user-select:none}
+/* 押せる範囲を、見た目はそのままで線の下へ広げる（カードの上の余白にかぶる程度） */
+#pos{position:relative;z-index:5}
+#pos::after{content:'';position:absolute;left:0;right:0;top:100%;height:16px}
+/* なぞっている間だけ出す、大きなページ番号 */
+#pos-big{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 56px);transform:translateX(-50%);z-index:30;pointer-events:none;
+  padding:6px 18px;border-radius:12px;background:var(--accent);color:var(--accent-fg);font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;
+  box-shadow:0 6px 18px rgba(0,0,0,.2);opacity:0;transition:opacity .15s}
+#pos-big.on{opacity:1}
 /* iOS 26 のすりガラスのぼかし対策（試し）：上端・下端に無地の帯を置く。画面の端に固定の無地があると、iOS がぼかしの代わりにその色を使うことがある */
 #edge-top,#edge-bottom{position:fixed;left:0;right:0;z-index:15;pointer-events:none;background:var(--paper)}
 #edge-top{top:0;height:calc(env(safe-area-inset-top,0px) + 1px)}

@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=45';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=45';
-import * as db from './db.js?v=45';
-import * as sync from './sync.js?v=45';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=46';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=46';
+import * as db from './db.js?v=46';
+import * as sync from './sync.js?v=46';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -526,16 +526,30 @@ cv.addEventListener('scroll', () => { if (!$('pop-g')) closePop(); }); // ゲス
 let posTicks = null, posRaf = 0;
 // 上の線をタップするとそこへ飛ぶ。なぞると原稿の中をすばやく移動できる（線の右端が書き出し）
 let posDrag = false;
+const SNAP_PX = 14; // 線の上で目盛りからこれだけ近ければ、そのページの頭へ吸い付く（画面上の距離）
 function posJump(x) {
   const tr = $('pos').querySelector('.track').getBoundingClientRect(); if (!tr.width) return;
-  const ratio = Math.min(1, Math.max(0, (tr.right - x) / tr.width));
-  allowJumpFor(400); setSL(-(ratio * cv.scrollWidth - cv.clientWidth / 2)); lastSl = getSL();
+  const ratio = Math.min(1, Math.max(0, (tr.right - x) / tr.width)), W = cv.scrollWidth;
+  // 目盛り（区切り）か右端（書き出し）の近くなら、そのページの頭が画面の右端に来るように止める
+  const heads = [0, ...(posTicks || [])];
+  const near = heads.reduce((b, d, i) => { const dist = Math.abs(ratio - d / W) * tr.width; return dist < SNAP_PX && (!b || dist < b.dist) ? { d, dist, i } : b; }, null);
+  allowJumpFor(400);
+  setSL(near ? -Math.max(0, near.d - 12) : -(ratio * W - cv.clientWidth / 2)); lastSl = getSL();
   if (lock) lock.dx = editDx();
-  drawPos();
+  drawPosNow();
+  // 吸い付いたときは、そのページの番号を出す（ページが狭いと、画面の真ん中は次のページになっていることがある）
+  posBig(true, near ? 'P' + (near.i === 0 ? 1 : near.i + leadPage()) : null);
+}
+// なぞっている間だけ、今のページを大きく出す
+function posBig(on, label) {
+  let el = $('pos-big');
+  if (!on) { if (el) el.classList.remove('on'); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'pos-big'; el.setAttribute('aria-hidden', 'true'); document.body.appendChild(el); }
+  el.textContent = label || $('pos').querySelector('.pg').textContent.split(' /')[0]; el.classList.toggle('on', !!el.textContent);
 }
 $('pos').addEventListener('pointerdown', e => { if (!active) return; e.preventDefault(); posDrag = true; try { $('pos').setPointerCapture(e.pointerId); } catch (_) { } posJump(e.clientX); });
 $('pos').addEventListener('pointermove', e => { if (posDrag) posJump(e.clientX); });
-['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => $('pos').addEventListener(t, () => { posDrag = false; }));
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => $('pos').addEventListener(t, () => { posDrag = false; setTimeout(() => { if (!posDrag) posBig(false); }, 350); }));
 sync.onChange(() => { if (active) drawSync(); });
 function drawPos() {
   if (posRaf) return;

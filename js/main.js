@@ -1,12 +1,12 @@
 // 起動と、一覧⇔編集の切り替え
-import { $, toast, applyTheme, getTheme } from './ui.js?v=45';
+import { $, toast, applyTheme, getTheme } from './ui.js?v=46';
 applyTheme(getTheme());
-import * as db from './db.js?v=45';
-import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=45';
-import { initList, renderList, newDoc } from './list.js?v=45';
-import * as sync from './sync.js?v=45';
-import { finishSignIn } from './dropbox.js?v=45';
-import { setTitle } from './textfile.js?v=45';
+import * as db from './db.js?v=46';
+import { openEditor, closeEditor, setOnBack, currentDoc, currentFolder, reloadEditor, flushSave, SAMPLE, SAMPLE_CAST } from './editor.js?v=46';
+import { initList, renderList, newDoc } from './list.js?v=46';
+import * as sync from './sync.js?v=46';
+import { finishSignIn } from './dropbox.js?v=46';
+import { setTitle } from './textfile.js?v=46';
 
 const state = { folders: [], docs: [] };
 
