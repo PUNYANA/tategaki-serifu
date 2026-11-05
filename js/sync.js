@@ -6,9 +6,9 @@
 //  ・ログインしていなければ何もしない（端末の中だけで使える）
 // 原稿の同期用の項目： doc.path（Dropbox 上のパス）, doc.rev, doc.dirty（未送信の変更あり）
 // 作品フォルダの項目： folder.synced（Dropbox にフォルダを作った）, folder.castRev, folder.castDirty
-import * as dbx from './dropbox.js?v=39';
-import * as db from './db.js?v=39';
-import { parseDoc, docStats, setTitle } from './textfile.js?v=39';
+import * as dbx from './dropbox.js?v=40';
+import * as db from './db.js?v=40';
+import { parseDoc, docStats, setTitle } from './textfile.js?v=40';
 
 let S = null;
 const listeners = [];

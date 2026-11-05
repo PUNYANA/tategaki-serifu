@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=39';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=39';
-import * as db from './db.js?v=39';
-import * as sync from './sync.js?v=39';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=40';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=40';
+import * as db from './db.js?v=40';
+import * as sync from './sync.js?v=40';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -557,8 +557,13 @@ function drawSync() {
    ・書いている間：それ以外のスクロールは全部戻し、書いている枠を画面上の同じ位置に留める
    ・書いていない間：一度に大きく飛んだときだけ戻す */
 let lastSl = 0, fingerDown = false, fingerMoved = false, mouseDown = false, userUntil = 0;
-let coasting = false, coastT = 0;          // 指を離したあとの惰性スクロール中か（スクロールが0.15秒途切れたら終わり）
+// 指を離したあとの惰性スクロール中か（スクロールが COAST_GAP 途切れたら終わり）。
+// 0.15秒だと、惰性の終わりぎわや描き直しで知らせが空いたときに「終わった」と見て戻してしまい、iOS と引っ張り合って震えた
+const COAST_GAP = 300;
+let coasting = false, coastT = 0;
 let reverts = [];                          // 直近で「戻した」時刻（iOS と引っ張り合っていないかの見張り）
+// 書いていない間に戻すのは「先頭（0）へ飛んだ」か「一度に画面の半分以上飛んだ」ときだけ。小さなずれ（惰性の続きなど）は戻さない
+const isJump = (sl, prev) => (Math.abs(sl) < 2 && Math.abs(prev) > 2) || Math.abs(sl - prev) > cv.clientWidth / 2;
 function allowJumpFor(ms) { userUntil = Math.max(userUntil, Date.now() + ms); }
 const userScrolling = () => (fingerDown && fingerMoved) || coasting || mouseDown || Date.now() < userUntil;
 cv.addEventListener('touchstart', () => { fingerDown = true; fingerMoved = false; coasting = false; }, { passive: true });
@@ -566,7 +571,7 @@ cv.addEventListener('touchstart', () => { fingerDown = true; fingerMoved = false
 cv.addEventListener('touchmove', () => { if (fingerDown && !(g && (g.kind === 'drag' || g.kind === 'pick'))) fingerMoved = true; }, { passive: true });
 const fingerUp = () => {
   // 指でスクロールしていたなら、惰性が止まるまでは人の操作として扱う（時間では区切らない）
-  if (fingerMoved) { coasting = true; clearTimeout(coastT); coastT = setTimeout(() => { coasting = false; }, 150); }
+  if (fingerMoved) { coasting = true; clearTimeout(coastT); coastT = setTimeout(() => { coasting = false; }, COAST_GAP); }
   fingerDown = false; fingerMoved = false;
 };
 cv.addEventListener('touchend', fingerUp, { passive: true });
@@ -576,20 +581,21 @@ window.addEventListener('pointerup', e => { if (e.pointerType !== 'touch') mouse
 cv.addEventListener('wheel', () => allowJumpFor(400), { passive: true });
 cv.addEventListener('scroll', () => {
   if (!active) return;
-  if (coasting) { clearTimeout(coastT); coastT = setTimeout(() => { coasting = false; }, 150); } // 惰性が続いている
+  if (coasting) { clearTimeout(coastT); coastT = setTimeout(() => { coasting = false; }, COAST_GAP); } // 惰性が続いている
   const sl = getSL();
+  // 短い間に何度も戻す羽目になったら（iOS と引っ張り合って震える）、戻すのをやめて今の位置を受け入れる
+  const fighting = () => { const now = Date.now(); reverts = reverts.filter(t => now - t < 600); if (reverts.length >= 3) { reverts = []; return true; } reverts.push(now); return false; };
   if (editing && lock) {
     if (userScrolling()) lock.dx = editDx();   // 人が動かした → その位置を新しい固定位置に
     else if (Math.abs(editDx() - lock.dx) > 1) {
-      // 勝手に動いた → 戻す。ただし短い間に何度も戻す羽目になったら（iOS と引っ張り合って震える）、戻すのをやめて今の位置を受け入れる
-      const now = Date.now(); reverts = reverts.filter(t => now - t < 600);
-      if (reverts.length >= 3) { lock.dx = editDx(); reverts = []; }
-      else { reverts.push(now); pin(); return; }
+      // 勝手に動いた → 戻す（引っ張り合いになったら今の位置を受け入れる）
+      if (fighting()) lock.dx = editDx();
+      else { pin(); return; }
     }
   } else if (hold && Date.now() < hold.until && !userScrolling() && Math.abs(sl - hold.v) > 2) {
-    putSL(hold.v); return; // 書き終えた直後の勝手な移動は戻す
-  } else if (!userScrolling() && Math.abs(sl - lastSl) > 2) { // 人もアプリも動かしていないのに動いた → どれだけ小さくても戻す
-    putSL(lastSl); return;
+    if (!fighting()) { putSL(hold.v); return; } // 書き終えた直後の勝手な移動は戻す
+  } else if (!userScrolling() && isJump(sl, lastSl)) { // 人もアプリも動かしていないのに、先頭へ・大きく飛んだ → 戻す
+    if (!fighting()) { putSL(lastSl); return; }
   }
   lastSl = sl;
   drawPos();
