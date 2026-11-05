@@ -382,9 +382,12 @@ function openCast() {
 
 /* ---- 出力・変換 ---- */
 let outMode = 'name';
-function exportText(withName, items) {
-  let pg = items.length && items[0].type !== 'div' ? 1 : 0; // 最初の区切りより前にセリフがあれば、最初の区切りは P2
-  return items.map(i => { if (i.type === 'div') { pg++; return '--- P' + pg; } const w = who(i.who); return withName && w ? `${w.name}：${i.text}` : i.text; }).join('\n\n');
+// それぞれの項目が何ページ目か（最初の区切りより前にセリフがあれば、そこが P1 で最初の区切りは P2）
+function pagesOf(items) { let pg = items.length && items[0].type !== 'div' ? 1 : 0; return items.map(i => i.type === 'div' ? ++pg : pg); }
+// pages：元の原稿でのページ番号（範囲を絞っても「--- P3」のように元の番号で出す）
+function exportText(withName, items, pages) {
+  pages = pages || pagesOf(items);
+  return items.map((i, k) => { if (i.type === 'div') return '--- P' + pages[k]; const w = who(i.who); return withName && w ? `${w.name}：${i.text}` : i.text; }).join('\n\n');
 }
 const importText = t => parseBody(t, st.cast, st.guests).map(mk); // 知らない名前はこの回のゲストになる
 function punct(t, o) { if (o.maru) t = t.replace(/[。｡]/g, ''); if (o.ten) t = t.replace(/[、､]/g, o.half ? ' ' : '　'); return t.replace(/[ 　]+$/gm, ''); }
@@ -392,10 +395,22 @@ function openMenu() {
   if (editing) finishEdit();
   const scopeSel = sel.size > 0;
   const scoped = () => scopeSel ? st.items.filter(i => sel.has(i.id)) : st.items;
+  // ページの範囲（書き出しだけに効く）。セリフを選んでいるときは選んだものが優先なので出さない
+  const allPg = pagesOf(st.items), nPg = allPg.length ? allPg[allPg.length - 1] : 0, firstPg = allPg.length ? allPg[0] : 1;
+  const useRange = !scopeSel && nPg - firstPg >= 1;
+  const opts = v => Array.from({ length: nPg - firstPg + 1 }, (_, k) => k + firstPg).map(p => `<option value="${p}"${p === v ? ' selected' : ''}>P${p}</option>`).join('');
+  const rangeHtml = useRange ? `<div class="row"><span class="lbl-t">ページ</span><select id="o-from" aria-label="書き出す最初のページ">${opts(firstPg)}</select><span>〜</span><select id="o-to" aria-label="書き出す最後のページ">${opts(nPg)}</select><button type="button" id="o-all">全部</button></div>` : '';
+  const outItems = () => {
+    if (!useRange) { const it = scoped(); return { it, pg: scopeSel ? allPg.filter((_, k) => sel.has(st.items[k].id)) : allPg }; }
+    let a = +$('o-from').value, b = +$('o-to').value; if (a > b) [a, b] = [b, a];
+    const it = [], pg = []; st.items.forEach((x, k) => { if (allPg[k] >= a && allPg[k] <= b) { it.push(x); pg.push(allPg[k]); } });
+    return { it, pg };
+  };
   $('layer').innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="出力・変換">
     <div class="row"><h2>出力・変換</h2><span class="sp"></span><span class="scope">${scopeSel ? `選択中の${sel.size}件が対象` : '全体が対象'}</span></div>
     <section><h3>書き出し</h3>
       <div class="seg" role="group" aria-label="書き出し形式"><button type="button" id="o-name">話者：セリフ</button><button type="button" id="o-raw">入力したまま</button></div>
+      ${rangeHtml}
       <textarea id="o-ta" readonly aria-label="書き出し結果"></textarea>
       <div class="row"><button type="button" class="pri" id="o-copy">コピー</button></div></section>
     <section><h3>句読点の一括変換</h3>
@@ -412,8 +427,10 @@ function openMenu() {
   </div></div>`;
   themeButtons($('mn-theme'));
   const ta = $('o-ta');
-  const draw = () => { ta.value = exportText(outMode === 'name', scoped()); $('o-name').className = outMode === 'name' ? 'on' : ''; $('o-raw').className = outMode === 'raw' ? 'on' : ''; };
-  $('o-name').onclick = () => { outMode = 'name'; draw(); }; $('o-raw').onclick = () => { outMode = 'raw'; draw(); }; draw();
+  const draw = () => { const o = outItems(); ta.value = exportText(outMode === 'name', o.it, o.pg); $('o-name').className = outMode === 'name' ? 'on' : ''; $('o-raw').className = outMode === 'raw' ? 'on' : ''; };
+  $('o-name').onclick = () => { outMode = 'name'; draw(); }; $('o-raw').onclick = () => { outMode = 'raw'; draw(); };
+  if (useRange) { $('o-from').onchange = draw; $('o-to').onchange = draw; $('o-all').onclick = () => { $('o-from').value = firstPg; $('o-to').value = nPg; draw(); }; }
+  draw();
   $('o-copy').onclick = () => {
     const ok = () => toast('コピーしました'), ng = () => { ta.focus(); ta.select(); toast('選択しました。コピーしてください'); };
     // http（同じWi-Fiから開いたとき）では clipboard が使えないので、試作版と同じく選択に切り替える
