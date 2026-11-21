@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=52';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=52';
-import * as db from './db.js?v=52';
-import * as sync from './sync.js?v=52';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=53';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=53';
+import * as db from './db.js?v=53';
+import * as sync from './sync.js?v=53';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -398,7 +398,7 @@ function openCast() {
 
 /* ---- 出力・変換 ---- */
 let outMode = 'name';
-let pgMode = 'range'; // 書き出すページの選び方：range（P〇〜P〇）／pick（ページを1つずつ選ぶ）
+let pgMode = 'range'; // 書き出すページの選び方：range（P〇〜P〇）／pick（1ページだけ）
 // それぞれの項目が何ページ目か（最初の区切りより前にセリフがあれば、そこが P1 で最初の区切りは P2）
 function pagesOf(items) { let pg = items.length && items[0].type !== 'div' ? 1 : 0; return items.map(i => i.type === 'div' ? ++pg : pg); }
 // pages：元の原稿でのページ番号（範囲を絞っても「--- P3」のように元の番号で出す）
@@ -418,16 +418,16 @@ function openMenu() {
   const allPg = pagesOf(st.items), nPg = allPg.length ? allPg[allPg.length - 1] : 0, firstPg = allPg.length ? allPg[0] : 1;
   const useRange = !scopeSel && nPg - firstPg >= 1;
   const opts = v => Array.from({ length: nPg - firstPg + 1 }, (_, k) => k + firstPg).map(p => `<option value="${p}"${p === v ? ' selected' : ''}>P${p}</option>`).join('');
-  // 「範囲」は P〇〜P〇 のつながった分。「ページを選ぶ」は飛び飛びでも選べる（P2 と P5 だけ、など）
+  // 「範囲」は P〇〜P〇 のつながった分。「1ページだけ」は押したページ1つだけ（複数選べるようにしたら使いにくかった）
   const pgList = Array.from({ length: nPg - firstPg + 1 }, (_, k) => k + firstPg);
-  const picked = new Set([firstPg]);
-  const rangeHtml = useRange ? `<div class="seg" role="group" aria-label="ページの選び方"><button type="button" id="o-m-range">範囲</button><button type="button" id="o-m-pick">ページを選ぶ</button></div>
+  let picked = firstPg;
+  const rangeHtml = useRange ? `<div class="seg" role="group" aria-label="ページの選び方"><button type="button" id="o-m-range">範囲</button><button type="button" id="o-m-pick">1ページだけ</button></div>
       <div class="row" id="o-range"><span class="lbl-t">ページ</span><select id="o-from" aria-label="書き出す最初のページ">${opts(firstPg)}</select><span>〜</span><select id="o-to" aria-label="書き出す最後のページ">${opts(nPg)}</select><button type="button" id="o-all">全部</button></div>
       <div class="row pg-pick" id="o-pick" role="group" aria-label="書き出すページ">${pgList.map(p => `<button type="button" data-p="${p}" aria-pressed="false">P${p}</button>`).join('')}</div>` : '';
   const outItems = () => {
     if (!useRange) { const it = scoped(); return { it, pg: scopeSel ? allPg.filter((_, k) => sel.has(st.items[k].id)) : allPg }; }
     let a = +$('o-from').value, b = +$('o-to').value; if (a > b) [a, b] = [b, a];
-    const want = pgMode === 'pick' ? p => picked.has(p) : p => p >= a && p <= b;
+    const want = pgMode === 'pick' ? p => p === picked : p => p >= a && p <= b;
     const it = [], pg = []; st.items.forEach((x, k) => { if (want(allPg[k])) { it.push(x); pg.push(allPg[k]); } });
     return { it, pg };
   };
@@ -461,11 +461,11 @@ function openMenu() {
     const showMode = () => {
       $('o-m-range').className = pgMode === 'range' ? 'on' : ''; $('o-m-pick').className = pgMode === 'pick' ? 'on' : '';
       $('o-range').hidden = pgMode !== 'range'; $('o-pick').hidden = pgMode !== 'pick';
-      $('o-pick').querySelectorAll('button').forEach(b => { const on = picked.has(+b.dataset.p); b.className = on ? 'on' : ''; b.setAttribute('aria-pressed', on); });
+      $('o-pick').querySelectorAll('button').forEach(b => { const on = +b.dataset.p === picked; b.className = on ? 'on' : ''; b.setAttribute('aria-pressed', on); });
       draw();
     };
     $('o-m-range').onclick = () => { pgMode = 'range'; showMode(); }; $('o-m-pick').onclick = () => { pgMode = 'pick'; showMode(); };
-    $('o-pick').onclick = e => { const b = e.target.closest('button'); if (!b) return; const p = +b.dataset.p; picked.has(p) ? picked.delete(p) : picked.add(p); showMode(); };
+    $('o-pick').onclick = e => { const b = e.target.closest('button'); if (!b) return; picked = +b.dataset.p; showMode(); };
     showMode();
   }
   draw();
