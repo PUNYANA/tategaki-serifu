@@ -99,6 +99,10 @@ button.chip.none{border-style:dashed;color:var(--muted);font-weight:400}
 .seg{display:inline-flex;border:1px solid var(--rule);border-radius:10px;overflow:hidden;align-self:flex-start}
 .seg button{border:0;border-radius:0;min-height:38px}
 .seg button.on{background:var(--accent);color:var(--accent-fg)}
+.pg-pick{gap:6px}
+.pg-pick button{min-width:3.2em;min-height:38px}
+.pg-pick button.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.sheet .row[hidden]{display:none}
 .cast{display:flex;gap:8px;align-items:center}
 .cast input{flex:1}
 .swatch{width:36px;height:36px;border-radius:50%;border:3px solid var(--sheet);box-shadow:0 0 0 1px var(--rule);padding:0;min-height:0;background:var(--c)}
