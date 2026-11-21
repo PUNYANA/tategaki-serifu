@@ -1,9 +1,9 @@
 // 原稿の編集画面。docs/tategaki-prototype.html の挙動をもとに、実機確認で変えた点を反映したもの（仕様書 5-2）。
 // 保存は IndexedDB に .txt 形式で、キャラ表は作品フォルダごと。
-import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=50';
-import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=50';
-import * as db from './db.js?v=50';
-import * as sync from './sync.js?v=50';
+import { $, esc, btn, toast, closeLayer, bgClose, spacer, themeButtons } from './ui.js?v=51';
+import { parseDoc, parseBody, serializeDoc, docStats, findCast, findSpeaker, newGuest, pickColor, COLORS, splitParas } from './textfile.js?v=51';
+import * as db from './db.js?v=51';
+import * as sync from './sync.js?v=51';
 
 export const SAMPLE_CAST = [{ id: 'c1', name: '後輩', color: COLORS[1] }, { id: 'c2', name: '先輩', color: COLORS[0] }];
 export const SAMPLE = [
@@ -403,7 +403,8 @@ function pagesOf(items) { let pg = items.length && items[0].type !== 'div' ? 1 :
 // pages：元の原稿でのページ番号（範囲を絞っても「--- P3」のように元の番号で出す）
 function exportText(withName, items, pages) {
   pages = pages || pagesOf(items);
-  return items.map((i, k) => { if (i.type === 'div') return '--- P' + pages[k]; const w = who(i.who); return withName && w ? `${w.name}：${i.text}` : i.text; }).join('\n\n');
+  // 「入力したまま」はセリフだけ。ページの区切り（--- P〇）は出さない
+  return items.filter(i => withName || i.type !== 'div').map((i, k) => { if (i.type === 'div') return '--- P' + pages[k]; const w = who(i.who); return withName && w ? `${w.name}：${i.text}` : i.text; }).join('\n\n');
 }
 const importText = t => parseBody(t, st.cast, st.guests).map(mk); // 知らない名前はこの回のゲストになる
 // 「、、」「、、、」→「…」は「、」をスペースにするより先にやる（先にスペースになると拾えない）
